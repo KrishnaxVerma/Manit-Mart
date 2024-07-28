@@ -1,0 +1,88 @@
+[
+    {
+        "id":1,
+        "name": "Story Book",
+        "title": "rem ipsum dolor sit amet consectetur adipisicing elit",
+        "price": 0,
+        "category": "Free",
+        "image":"https://img.freepik.com/free-vector/hand-drawn-flat-design-stack-books-illustration_23-2149341898.jpg?t=st=1721666563~exp=1721670163~hmac=3e572610c33f5b0b28744e420e869c030941d75b6f1dcc4de95e9e73503cf39a&w=740"
+    },
+    {
+        "id":2,
+        "name": "Music Book",
+        "title": "rem ipsum dolor sit amet consectetur adipisicing elit",
+        "price": 100,
+        "category": "Sports",
+        "image":"https://img.freepik.com/free-vector/hand-drawn-flat-design-stack-books-illustration_23-2149341898.jpg?t=st=1721666563~exp=1721670163~hmac=3e572610c33f5b0b28744e420e869c030941d75b6f1dcc4de95e9e73503cf39a&w=740"
+    },
+    {
+        "id":3,
+        "name": "Sports Book",
+        "title": "rem ipsum dolor sit amet consectetur adipisicing elit",
+        "price": 50,
+        "category": "Sports",
+        "image":"https://img.freepik.com/free-vector/hand-drawn-flat-design-stack-books-illustration_23-2149341898.jpg?t=st=1721666563~exp=1721670163~hmac=3e572610c33f5b0b28744e420e869c030941d75b6f1dcc4de95e9e73503cf39a&w=740"
+    },
+    {
+        "id":4,
+        "name": "Sports Book",
+        "title": "rem ipsum dolor sit amet consectetur adipisicing elit",
+        "price": 50,
+        "category": "Sports",
+        "image":"https://img.freepik.com/free-vector/hand-drawn-flat-design-stack-books-illustration_23-2149341898.jpg?t=st=1721666563~exp=1721670163~hmac=3e572610c33f5b0b28744e420e869c030941d75b6f1dcc4de95e9e73503cf39a&w=740"
+    },
+    
+    {
+        "id":5,
+        "name": "Fun Book",
+        "title": "rem ipsum dolor sit amet consectetur adipisicing elit",
+        "price": 20,
+        "category": "Enjoy",
+        "image":"https://img.freepik.com/free-vector/hand-drawn-flat-design-stack-books-illustration_23-2149341898.jpg?t=st=1721666563~exp=1721670163~hmac=3e572610c33f5b0b28744e420e869c030941d75b6f1dcc4de95e9e73503cf39a&w=740"
+    },
+
+    {
+        "id":6,
+        "name": "Food Book",
+        "title": "rem ipsum dolor sit amet consectetur adipisicing elit",
+        "price": 200,
+        "category": "Enjoy",
+        "image":"https://img.freepik.com/free-vector/hand-drawn-flat-design-stack-books-illustration_23-2149341898.jpg?t=st=1721666563~exp=1721670163~hmac=3e572610c33f5b0b28744e420e869c030941d75b6f1dcc4de95e9e73503cf39a&w=740"
+    },
+
+    {
+        "id":7,
+        "name": "Poem Book",
+        "title": "rem ipsum dolor sit amet consectetur adipisicing elit",
+        "price": 0,
+        "category": "Poem",
+        "image":"https://img.freepik.com/free-vector/hand-drawn-flat-design-stack-books-illustration_23-2149341898.jpg?t=st=1721666563~exp=1721670163~hmac=3e572610c33f5b0b28744e420e869c030941d75b6f1dcc4de95e9e73503cf39a&w=740"
+    },
+
+    {
+        "id":8,
+        "name": "Drama Book",
+        "title": "rem ipsum dolor sit amet consectetur adipisicing elit",
+        "price": 0,
+        "category": "Drama",
+        "image":"https://img.freepik.com/free-vector/hand-drawn-flat-design-stack-books-illustration_23-2149341898.jpg?t=st=1721666563~exp=1721670163~hmac=3e572610c33f5b0b28744e420e869c030941d75b6f1dcc4de95e9e73503cf39a&w=740"
+    },
+
+    {
+        "id":9,
+        "name": "Action Book",
+        "title": "rem ipsum dolor sit amet consectetur adipisicing elit",
+        "price": 0,
+        "category": "Action",
+        "image":"https://img.freepik.com/free-vector/hand-drawn-flat-design-stack-books-illustration_23-2149341898.jpg?t=st=1721666563~exp=1721670163~hmac=3e572610c33f5b0b28744e420e869c030941d75b6f1dcc4de95e9e73503cf39a&w=740"
+    },
+
+    {
+        "id":10,
+        "name": "Adult Book",
+        "title": "rem ipsum dolor sit amet consectetur adipisicing elit",
+        "price": 500,
+        "category": "Adult",
+        "image":"https://img.freepik.com/free-vector/hand-drawn-flat-design-stack-books-illustration_23-2149341898.jpg?t=st=1721666563~exp=1721670163~hmac=3e572610c33f5b0b28744e420e869c030941d75b6f1dcc4de95e9e73503cf39a&w=740"
+    }
+]
