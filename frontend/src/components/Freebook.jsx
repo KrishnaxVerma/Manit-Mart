@@ -1,5 +1,4 @@
-import React from 'react'
-import list from "../../public/list.json"
+import React, { useEffect, useState } from 'react';
 
 import "slick-carousel/slick/slick.css";
 import "slick-carousel/slick/slick-theme.css";
@@ -7,12 +6,29 @@ import "slick-carousel/slick/slick-theme.css";
 import Slider from "react-slick";
 import Card from './Card';
 
+import axios from "axios";
+
 function Freebook() {
+    const [book, setBook] = useState([]);
+    const [loading, setLoading] = useState(true);
+    const [error, setError] = useState(null);
 
-    const filterData = list
-    
+    useEffect(() => {
+        const getBook = async () => {
+            try {
+                const res = await axios.get("http://localhost:4001/book");
+                const data = res.data.filter((data) => data.price === 0);
+                setBook(data);
+            } catch (error) {
+                setError(error.message);
+            } finally {
+                setLoading(false);
+            }
+        };
+        getBook();
+    }, []);
 
-    var settings = {
+    const settings = {
         dots: true,
         infinite: false,
         speed: 500,
@@ -48,22 +64,26 @@ function Freebook() {
     };
 
     return (
-        <>
-            <div className='max-w-screen-2xl container mx-auto md:px-20 px-4'>
-                <div>
-                    <h1 className='font-semibold text-xl pb-2'>Free Offered Courses</h1>
-                    <p>Lorem ipsum, dolor sit amet consectetur adipisicing elit. Quam, officiis? Lorem ipsum dolor sit amet consectetur adipisicing elit. Praesentium, repellat.</p>
-                </div>
-                <div>
-                <Slider {...settings}>
-                    {filterData.map((item) => (
-                        <Card item={item} key={item.id} />
-                    ))}
-                </Slider>
-                </div>
+        <div className='max-w-screen-2xl container mx-auto md:px-20 px-4'>
+            <div>
+                <h1 className='font-semibold text-xl pb-2'>Free Offered Courses</h1>
+                <p>Lorem ipsum, dolor sit amet consectetur adipisicing elit. Quam, officiis? Lorem ipsum dolor sit amet consectetur adipisicing elit. Praesentium, repellat.</p>
             </div>
-        </>
-    )
+            <div>
+                {loading ? (
+                    <p>Loading...</p>
+                ) : error ? (
+                    <p>Error: {error}</p>
+                ) : (
+                    <Slider {...settings}>
+                        {book.map(({ id, ...item }) => (
+                            <Card key={id} item={item} />
+                        ))}
+                    </Slider>
+                )}
+            </div>
+        </div>
+    );
 }
 
-export default Freebook
+export default Freebook;
