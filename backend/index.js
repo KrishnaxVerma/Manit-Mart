@@ -7,6 +7,9 @@ const app= express();
 import bookRoute from "./route/Book.route.js"
 import userRoute from "./route/user.route.js"
 
+import buyRoute from "./route/buy.route.js"
+import sellRoute from "./route/sell.route.js"
+
 dotenv.config()
 
 app.use(cors())
@@ -21,10 +24,7 @@ app.use(express.urlencoded({ extended: true }));
 const URI= process.env.MongoDBURI
 
 try{
-  mongoose.connect(URI, {
-    useNewUrlParser: true,
-    useUnifiedTopology: true
-  });
+  mongoose.connect(URI);
   console.log("Connected to MongoDB")
 }
 catch(error){
@@ -32,6 +32,8 @@ catch(error){
 }
 
 //defining final route
+app.use("/buy", buyRoute)
+app.use("/sell", sellRoute)
 app.use("/book", bookRoute)
 app.use("/user", userRoute)
 

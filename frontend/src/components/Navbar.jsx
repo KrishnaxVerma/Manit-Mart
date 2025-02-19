@@ -9,13 +9,13 @@ const navItems = (
       <a href='/'>Home</a>
     </li>
     <li key="course">
-      <a href='/course'>Course</a>
+      <a href='/buy'>Buy</a>
+    </li>
+    <li key="sell">
+      <a href='/sell'>Sell</a>
     </li>
     <li key="contact">
-      <a href='/contact'>Contact</a>
-    </li>
-    <li key="about">
-      <a>About</a>
+      <a href='/contact'>Contact Us</a>
     </li>
   </>
 );
@@ -79,7 +79,7 @@ function Navbar() {
                 {navItems}
               </ul>
             </div>
-            <a className="text-2xl font-bold cursor-pointer">bookStore</a>
+            <a className="text-2xl font-bold cursor-pointer">MANIT Mart</a>
           </div>
           <div className="navbar-end space-x-3">
             <div className="navbar-center hidden lg:flex">

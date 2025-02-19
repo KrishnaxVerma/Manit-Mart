@@ -4,6 +4,8 @@
 import React from "react"
 import Home from "./Home/Home"
 import Courses from "./Courses/courses"
+import Buy from "./Buy/buy"
+import Sell from "./Sell/sell"
 import Signup from "./components/Signup"
 import { Toaster } from 'react-hot-toast';
 
@@ -22,8 +24,12 @@ export default function App() {
       element: <> <Home/> </>
     },
     {
-      path:"/course",
-      element: <> {authUser? <Courses/> : <Navigate to="/signup" />} </>
+      path:"/buy",
+      element: <> {authUser? <Buy/> : <Navigate to="/signup" />} </>
+    },
+    {
+      path:"/sell",
+      element: <> {authUser? <Sell/> : <Navigate to="/signup" />} </>
     },
     {
       path:"/signup",

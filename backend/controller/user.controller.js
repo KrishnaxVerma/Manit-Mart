@@ -4,15 +4,15 @@ import bcryptjs from "bcryptjs";
 // Signup function
 export const signup = async (req, res) => {
     try {
-        const { fullname, email, password } = req.body;
+        const { fullname, phoneNumber, password } = req.body;
 
         // Validate input
-        if (!fullname || !email || !password) {
+        if (!fullname || !phoneNumber || !password) {
             return res.status(400).json({ message: "All fields are required" });
         }
 
         // Check if user already exists
-        const existingUser = await User.findOne({ email });
+        const existingUser = await User.findOne({ phoneNumber });
         if (existingUser) {
             return res.status(400).json({ message: "User already exists" });
         }
@@ -23,7 +23,7 @@ export const signup = async (req, res) => {
         // Create and save the new user
         const newUser = new User({
             fullname,
-            email,
+            phoneNumber,
             password: hashedPassword
         });
         await newUser.save();
@@ -31,7 +31,7 @@ export const signup = async (req, res) => {
         return res.status(201).json({ message: "User created successfully", user:{
             _id: newUser._id,
             fullname: newUser.fullname,
-            email: newUser.email
+            phoneNumber: newUser.phoneNumber
         } });
     } catch (error) {
         console.error("Error during signup: ", error.message);
@@ -42,23 +42,23 @@ export const signup = async (req, res) => {
 // Login function
 export const login = async (req, res) => {
     try {
-        const { email, password } = req.body;
+        const { phoneNumber, password } = req.body;
 
         // Validate input
-        if (!email || !password) {
-            return res.status(400).json({ message: "Email and password are required" });
+        if (!phoneNumber || !password) {
+            return res.status(400).json({ message: "Phone Number and password are required" });
         }
 
         // Find the user
-        const user = await User.findOne({ email });
+        const user = await User.findOne({ phoneNumber });
         if (!user) {
-            return res.status(400).json({ message: "Invalid email or password" });
+            return res.status(400).json({ message: "Invalid Phone Number or password" });
         }
 
         // Compare passwords
         const isMatch = await bcryptjs.compare(password, user.password);
         if (!isMatch) {
-            return res.status(400).json({ message: "Invalid email or password" });
+            return res.status(400).json({ message: "Invalid Phone Number or password" });
         }
 
         // Successful login
@@ -67,7 +67,7 @@ export const login = async (req, res) => {
             user: {
                 _id: user._id,
                 fullname: user.fullname,
-                email: user.email
+                phoneNumber: user.phoneNumber
             }
         });
     } catch (error) {

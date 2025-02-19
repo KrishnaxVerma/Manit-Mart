@@ -1,18 +1,18 @@
 import React from 'react'
 import Navbar from '../components/Navbar'
-import Banner from '../components/Banner'
-import Freebook from '../components/Freebook'
 import Footer from '../components/Footer'
+import Sell from '../components/Sell'
 
-function Home() {
+function sell() {
   return (
     <>
         <Navbar />
-        <Banner />
-        {/* <Freebook /> */}
+        <div className='min-h-screen'>
+            <Sell />
+        </div>
         <Footer />
     </>
   )
 }
 
-export default Home
+export default sell

@@ -17,7 +17,7 @@ function Signup() {
     const onSubmit = async(data) => {
         const userInfo={
             fullname: data.fullname,
-            email: data.email,
+            phoneNumber: data.phoneNumber,
             password: data.password
         }
         await axios.post("http://localhost:4001/user/signup", userInfo)
@@ -58,18 +58,18 @@ function Signup() {
                             <br />
                             {errors.fullname && <span className='text-sm text-red-600'>This field is required</span>}
                         </div>
-                        {/* Email */}
+                        {/* Phone Number */}
                         <div className='mt-4 space-y-2'>
-                            <span>Email</span>
+                            <span>Phone Number</span>
                             <br />
                             <input 
-                            type="email" 
-                            placeholder='Enter your email' 
+                            type="string" 
+                            placeholder='Enter your Phone Number' 
                             className='w-80 px-3 py-1 border rounded-md outline-none dark:bg-slate-900 dark:text-white' 
-                            {...register("email", { required: true })}
+                            {...register("phoneNumber", { required: true })}
                             />
                             <br />
-                            {errors.email && <span className='text-sm text-red-600'>This field is required</span>}
+                            {errors.phoneNumber && <span className='text-sm text-red-600'>This field is required</span>}
                         </div>
                         {/* Password */}
                         <div className='mt-4 space-y-2'>
@@ -77,7 +77,7 @@ function Signup() {
                             <br />
                             <input 
                             type="password" 
-                            placeholder='Enter your email' 
+                            placeholder='Enter your Phone Number' 
                             className='w-80 px-3 py-1 border rounded-md outline-none dark:bg-slate-900 dark:text-white' 
                             {...register("password", { required: true })}
                             />

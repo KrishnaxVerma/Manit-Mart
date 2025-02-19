@@ -40,18 +40,18 @@ function Contact() {
                             <br />
                             {errors.name && <span className='text-sm text-red-600'>This field is required</span>}
                         </div>
-                        {/* Email */}
+                        {/* Phone Number */}
                         <div className='mt-4 space-y-2'>
-                            <span>Email</span>
+                            <span>Phone Number</span>
                             <br />
                             <input 
-                            type="email" 
-                            placeholder='Enter your email' 
+                            type="string" 
+                            placeholder='Enter your Phone Number' 
                             className='w-80 px-3 py-1 border rounded-md outline-none' 
-                            {...register("email", { required: true })}
+                            {...register("phoneNumber", { required: true })}
                             />
                             <br />
-                            {errors.email && <span className='text-sm text-red-600'>This field is required</span>}
+                            {errors.phoneNumber && <span className='text-sm text-red-600'>This field is required</span>}
                         </div>
                         {/* Message */}
                         <div className='mt-4 space-y-2'>

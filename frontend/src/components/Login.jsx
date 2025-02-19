@@ -12,7 +12,7 @@ function Login() {
     } = useForm()
     const onSubmit = async(data) =>{
         const userInfo={
-            email: data.email,
+            phoneNumber: data.phoneNumber,
             password: data.password
         }
         await axios.post("http://localhost:4001/user/login", userInfo)
@@ -44,18 +44,18 @@ function Login() {
                         {/* if there is a button in form, it will close the modal */}
                         <Link to="/" className="btn btn-sm btn-circle btn-ghost absolute right-2 top-2" onClick={() => document.getElementById("my_modal_3").close()}>✕</Link>
                         <h3 className="font-bold text-lg">Login</h3>
-                        {/* Email */}
+                        {/* Phone Number */}
                         <div className='mt-4 space-y-2'>
-                            <span>Email</span>
+                            <span>Phone Number</span>
                             <br />
                             <input
-                                type="email"
-                                placeholder='Enter your email'
+                                type="string"
+                                placeholder='Enter your Phone Number'
                                 className='w-80 px-3 py-1 border rounded-md outline-none dark:bg-slate-900 dark:text-white'
-                                {...register("email", { required: true })}
+                                {...register("phoneNumber", { required: true })}
                             />
                             <br />
-                            {errors.email && <span className='text-sm text-red-600'>This field is required</span>}
+                            {errors.phoneNumber && <span className='text-sm text-red-600'>This field is required</span>}
                         </div>
                         {/* Password */}
                         <div className='mt-4 space-y-2'>
@@ -68,7 +68,7 @@ function Login() {
                                 {...register("password", { required: true })}
                             />
                             <br />
-                            {errors.email && <span className='text-sm text-red-600'>This field is required</span>}
+                            {errors.phoneNumber && <span className='text-sm text-red-600'>This field is required</span>}
                         </div>
                         {/* Button */}
                         <div className='flex justify-around mt-4 '>
