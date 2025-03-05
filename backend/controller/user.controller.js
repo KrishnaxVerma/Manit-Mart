@@ -1,4 +1,5 @@
 import User from "../model/user.model.js";
+import Product from "../model/product.model.js";
 import bcryptjs from "bcryptjs";
 
 // Signup function
@@ -75,3 +76,59 @@ export const login = async (req, res) => {
         return res.status(500).json({ message: "Internal server error" });
     }
 };
+
+//Update
+export const updateInfo = async (req, res) => {
+    try {
+        const {_id, fullname, phoneNumber, password}= req.body;
+        // console.log(req.body);
+        const currUser= await User.findById(_id);
+        if(!currUser){
+            return res.status(400).json({message: "User not found"})
+        }
+
+        if(phoneNumber){   
+            const updatedProducts = await Product.updateMany(
+                { phoneNumber: currUser.phoneNumber }, 
+                { phoneNumber:  phoneNumber }        
+            );
+        }
+
+        let hashedPassword;
+        if(password)
+            hashedPassword= await bcryptjs.hash(password, 10);
+
+        if(phoneNumber || fullname || password){
+            const updatedUser = await User.findOneAndUpdate(
+                { _id: _id },
+                {
+                    $set: {
+                        fullname: fullname || currUser.fullname,
+                        phoneNumber: phoneNumber || currUser.phoneNumber,
+                        password: hashedPassword || currUser.password
+                    }
+                },
+                { new: true } 
+            );
+            
+            if (!updatedUser) {
+                return res.status(404).json({ message: "User not found" });
+            }
+            
+            return res.status(200).json({
+                message: "Updated successfully",
+                user: {
+                    _id: updatedUser._id,
+                    fullname: updatedUser.fullname,
+                    phoneNumber: updatedUser.phoneNumber,
+                    password: updatedUser.password
+                }
+            });            
+        }
+        
+
+        
+    } catch (err) {
+        return res.status(500).json({ message: "Internal Server Error" });
+    }
+}

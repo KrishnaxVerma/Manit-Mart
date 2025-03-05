@@ -40,7 +40,7 @@ function Signup() {
         <div className='flex h-screen items-center justify-center'>
             <div className="w-[600px]">
                 <div className="modal-box dark:bg-slate-900 dark:text-white">
-                    <form onSubmit={handleSubmit(onSubmit)} method="dialog">
+                    <form onSubmit={handleSubmit(onSubmit)}>
                         {/* if there is a button in form, it will close the modal */}
                         <Link to="/" className="btn btn-sm btn-circle btn-ghost absolute right-2 top-2">✕</Link>
 
@@ -66,10 +66,13 @@ function Signup() {
                             type="string" 
                             placeholder='Enter your Phone Number' 
                             className='w-80 px-3 py-1 border rounded-md outline-none dark:bg-slate-900 dark:text-white' 
-                            {...register("phoneNumber", { required: true })}
+                            {...register("phoneNumber", {
+                                required: "Phone number is required",
+                                pattern: { value: /^[0-9]{10}$/, message: "Invalid phone number" }
+                              })}
                             />
                             <br />
-                            {errors.phoneNumber && <span className='text-sm text-red-600'>This field is required</span>}
+                            {errors.phoneNumber && <span className='text-sm text-red-600'>{errors.phoneNumber.message}</span>}
                         </div>
                         {/* Password */}
                         <div className='mt-4 space-y-2'>
@@ -87,12 +90,12 @@ function Signup() {
                         {/* Button */}
                         <div className='flex justify-around mt-4 '>
                             <button className='bg-pink-500 text-white rounded-md px-3 py-1 hover:bg-pink-700 duration-200'>Signup</button>
-                            <p className='text-xl'>
+                            <span className='text-xl'>
                                 Have an account? <button className='underline text-blue-500 cursor-pointer' onClick={() => document.getElementById('my_modal_3').showModal()}>Login</button>
-                                <Login />
-                            </p>
+                            </span>
                         </div>
                     </form>
+                    <Login />
                 </div>
             </div>
         </div >

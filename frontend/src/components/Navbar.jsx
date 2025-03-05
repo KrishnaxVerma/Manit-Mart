@@ -14,6 +14,9 @@ const navItems = (
     <li key="sell">
       <a href='/sell'>Sell</a>
     </li>
+    <li key="profile">
+      <a href='/profile'>Profile</a>
+    </li>
     <li key="contact">
       <a href='/contact'>Contact Us</a>
     </li>
@@ -87,7 +90,7 @@ function Navbar() {
                 {navItems}
               </ul>
             </div>
-            <div className='hidden md:block'>
+            {/* <div className='hidden md:block'>
               <label className="px-3 py-1 border rounded-md flex items-center gap-2">
                 <input type="text" className="grow outline-none dark:bg-slate-900 dark:text-white" placeholder="Search" />
                 <svg
@@ -101,7 +104,7 @@ function Navbar() {
                     clipRule="evenodd" />
                 </svg>
               </label>
-            </div>
+            </div> */}
             <label className="swap swap-rotate">
               {/* this hidden checkbox controls the state */}
               <input type="checkbox" className="theme-controller" checked={theme === "dark"} onChange={() => setTheme(theme === "light" ? "dark" : "light")} />

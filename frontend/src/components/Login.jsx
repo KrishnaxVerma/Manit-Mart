@@ -40,7 +40,7 @@ function Login() {
         <div>
             <dialog id="my_modal_3" className="modal">
                 <div className="modal-box dark:bg-slate-900 dark:text-white">
-                    <form onSubmit={handleSubmit(onSubmit)} method="dialog">
+                    <form onSubmit={handleSubmit(onSubmit)}>
                         {/* if there is a button in form, it will close the modal */}
                         <Link to="/" className="btn btn-sm btn-circle btn-ghost absolute right-2 top-2" onClick={() => document.getElementById("my_modal_3").close()}>✕</Link>
                         <h3 className="font-bold text-lg">Login</h3>
@@ -49,7 +49,7 @@ function Login() {
                             <span>Phone Number</span>
                             <br />
                             <input
-                                type="string"
+                                type="text"
                                 placeholder='Enter your Phone Number'
                                 className='w-80 px-3 py-1 border rounded-md outline-none dark:bg-slate-900 dark:text-white'
                                 {...register("phoneNumber", { required: true })}
@@ -68,14 +68,14 @@ function Login() {
                                 {...register("password", { required: true })}
                             />
                             <br />
-                            {errors.phoneNumber && <span className='text-sm text-red-600'>This field is required</span>}
+                            {errors.password && <span className='text-sm text-red-600'>This field is required</span>}
                         </div>
                         {/* Button */}
                         <div className='flex justify-around mt-4 '>
                             <button type='submit' className='bg-pink-500 text-white rounded-md px-3 py-1 hover:bg-pink-700 duration-200'>Login</button>
-                            <p>
+                            <span>
                                 Not registered? <Link to="/signup" className='underline text-blue-500 cursor-pointer'>Signup</Link>
-                            </p>
+                            </span>
                         </div>
                     </form>
                 </div>

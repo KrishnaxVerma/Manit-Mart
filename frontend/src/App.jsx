@@ -6,6 +6,7 @@ import Home from "./Home/Home"
 import Courses from "./Courses/courses"
 import Buy from "./Buy/buy"
 import Sell from "./Sell/sell"
+import Profile from "./components/Profile"
 import Signup from "./components/Signup"
 import { Toaster } from 'react-hot-toast';
 
@@ -30,6 +31,10 @@ export default function App() {
     {
       path:"/sell",
       element: <> {authUser? <Sell/> : <Navigate to="/signup" />} </>
+    },
+    {
+      path:"/profile",
+      element: <> {authUser? <Profile/> : <Navigate to="/signup" />} </>
     },
     {
       path:"/signup",
