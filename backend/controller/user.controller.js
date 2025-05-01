@@ -93,6 +93,7 @@ export const updateInfo = async (req, res) => {
                 { phoneNumber:  phoneNumber }        
             );
         }
+        // console.log("HIIII")
 
         let hashedPassword;
         if(password)

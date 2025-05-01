@@ -20,8 +20,11 @@ function Signup() {
             phoneNumber: data.phoneNumber,
             password: data.password
         }
-        await axios.post("http://localhost:4001/user/signup", userInfo)
-        .then((res)=>{
+        await axios.post(import.meta.env.VITE_HOSTURL+"user/signup", userInfo)
+        .then((res)=>{console.log('Signup component rendered')
+console.log('Location:', location)
+console.log('Navigate:', navigate)
+console.log('From:', from)
             console.log(res.data)
             if(res.data){
                 toast.success("Signup Successfully");

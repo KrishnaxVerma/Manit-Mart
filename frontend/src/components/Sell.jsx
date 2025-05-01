@@ -7,44 +7,74 @@ import axios from "axios"
 
 function Sell() {
     const [product, setProduct] = useState([])
-    useEffect(()=>{
-        const getProduct= async()=>{
-            try {
-                const user = JSON.parse(localStorage.getItem("Users"));
-                if (!user?.phoneNumber) {
-                    console.error("User not found in localStorage");
-                    return;
-                }
-        
-                const { data } = await axios.post("http://localhost:4001/sell/myproduct", { user });
-                // console.log("Products:", data);
-                setProduct(data);
-            } catch (error) {
-                console.error("Error fetching products:", error);
+    
+    const fetchProducts = async () => {
+        try {
+            const user = JSON.parse(localStorage.getItem("Users"));
+            if (!user?.phoneNumber) {
+                console.error("User not found in localStorage");
+                return;
             }
+    
+            const { data } = await axios.post(import.meta.env.VITE_HOSTURL+"sell/myproduct", { user });
+            setProduct(data);
+        } catch (error) {
+            console.error("Error fetching products:", error);
         }
-        getProduct()
-    },[])
+    }
+    
+    useEffect(() => {
+        fetchProducts();
+    }, [])
 
-    const navigate= useNavigate()
+    const handleDeleteProduct = async (productId) => {
+        try {
+            const user = JSON.parse(localStorage.getItem("Users"));
+            if (!user?.phoneNumber) {
+                console.error("User not found in localStorage");
+                return;
+            }
+            
+            // Confirm deletion
+            if (!confirm("Are you sure you want to delete this product?")) {
+                return;
+            }
+            
+            // Send delete request to server
+            await axios.delete(import.meta.env.VITE_HOSTURL+`sell/deleteproduct/${productId}/${user.phoneNumber}`);
+            
+            // Update UI by removing the deleted product
+            setProduct(product.filter(item => item._id !== productId));
+            toast.success("Product deleted successfully");
+        } catch (error) {
+            console.error("Error deleting product:", error);
+            toast.error("Failed to delete product");
+        }
+    }
+
+    const navigate = useNavigate()
     const {
         register,
         handleSubmit,
         formState: { errors },
+        reset
     } = useForm()
+    
     const onSubmit = async (data) => {
-        const user=JSON.parse(localStorage.getItem("Users"));
-        data={...data, phoneNumber: user.phoneNumber}
-        // console.log(data);
+        const user = JSON.parse(localStorage.getItem("Users"));
+        data = {...data, phoneNumber: user.phoneNumber}
 
-        try{
-            const res= await axios.post("http://localhost:4001/sell/addproduct", data);
-            toast.success("Product Added Successfully");                
+        try {
+            await axios.post(import.meta.env.VITE_HOSTURL+"sell/addproduct", data);
+            toast.success("Product Added Successfully"); 
+            // Reset form
+            reset();
+            // Refresh product list
+            fetchProducts();             
         } catch (error) {
             console.error("Error listing product:", error);
             toast.error("Failed to add product");
         }
-
     }
 
   return (
@@ -65,13 +95,13 @@ function Sell() {
                     <div>
                         <h1 className='mt-8 text-xl font-semibold md:text-4xl'>Your Listed Items</h1>
                         <div className='mt-12 grid grid-cols-1 md:grid-cols-4'>
-                            {/* {
-                                product.map((item)=>{
-                                    return <Card item={item} key={item.id} />
-                                })
-                            } */}
                             {product.map((item, index) => (
-                                <Card item={item} key={index} />
+                                <Card 
+                                    item={item} 
+                                    key={index}
+                                    onDelete={() => handleDeleteProduct(item._id)} 
+                                    showDeleteButton={true}
+                                />
                             ))}
                         </div>
                         
@@ -113,9 +143,9 @@ function Sell() {
                                 <select 
                                 {...register("category", { required: true })} 
                                 name="category" className="w-[80%] px-3 py-1 border rounded-md outline-none text-black">
-                                    <option value="Accessory">Accessory</option>
+                                    <option value="Accessories">Accessories</option>
                                     <option value="Electronics">Electronics</option>
-                                    <option value="Book">Book</option>
+                                    <option value="Books">Books</option>
                                     <option value="Stationary">Stationary</option>
                                 </select>
                                 <br />
@@ -134,18 +164,6 @@ function Sell() {
                                 <br />
                                 {errors.imageURL && <span className='text-sm text-red-600'>This field is required</span>}
                             </div>
-                            {/* Description */}
-                            {/* <div className='mt-4 space-y-2'>
-                                <span>Message</span>
-                                <br />
-                                <textarea
-                                placeholder='Type your message' 
-                                className='w-[80%] h-40 px-3 py-1 border rounded-md outline-none' 
-                                {...register("message", { required: true })}
-                                />
-                                <br />
-                                {errors.message && <span className='text-sm text-red-600'>This field is required</span>}
-                            </div> */}
                             {/* Button */}
                             <div className='mt-5'>
                                 <button className='bg-blue-500 text-white rounded-md px-3 py-1 hover:bg-blue-700 duration-200'>Submit</button>
@@ -156,7 +174,6 @@ function Sell() {
                 </div>
             </div>
         </div>
-
     </>
   )
 }
