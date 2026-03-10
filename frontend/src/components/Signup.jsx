@@ -1,108 +1,126 @@
-import React from 'react'
-import { Link, Navigate, useLocation, useNavigate } from 'react-router-dom'
-import Login from './Login'
-import { useForm } from "react-hook-form"
-import axios from "axios"
+import { useState } from 'react'
+import { createUserWithEmailAndPassword } from 'firebase/auth'
+import { setDoc, doc } from 'firebase/firestore'
+import { auth, db, sendEmailVerification } from '../firebase'
+import { useNavigate } from 'react-router-dom'
 import toast from 'react-hot-toast'
 
-function Signup() {
-    const location= useLocation()
-    const navigate= useNavigate()
-    const from= location.state?.from?.pathname || "/"
-    const {
-        register,
-        handleSubmit,
-        formState: { errors },
-    } = useForm()
-    const onSubmit = async(data) => {
-        const userInfo={
-            fullname: data.fullname,
-            phoneNumber: data.phoneNumber,
-            password: data.password
-        }
-        await axios.post(import.meta.env.VITE_HOSTURL+"user/signup", userInfo)
-        .then((res)=>{console.log('Signup component rendered')
-console.log('Location:', location)
-console.log('Navigate:', navigate)
-console.log('From:', from)
-            console.log(res.data)
-            if(res.data){
-                toast.success("Signup Successfully");
-                navigate(from, {replace: true})
-            }
-            localStorage.setItem("Users", JSON.stringify(res.data.user))
-        }).catch((err)=>{
-            if(err.response){
-                console.log(err.message)
-                toast.error("Error: "+ err.response.data.message);
-            }
-        })
+export default function Signup() {
+  const [nm, setNm] = useState('')
+  const [em, setEm] = useState('')
+  const [pw, setPw] = useState('')
+  const [ht, setHt] = useState('')
+  const [ld, setLd] = useState(false)
+  const nav = useNavigate()
+
+  const isValidEmail = (email) => email.endsWith('@stu.manit.ac.in')
+
+  const sub = async (e) => {
+    e.preventDefault()
+    if (!isValidEmail(em)) {
+      toast.error('Only @stu.manit.ac.in emails allowed')
+      return
     }
+    setLd(true)
+    try {
+      const cred = await createUserWithEmailAndPassword(auth, em, pw)
+      const u = cred.user
+      const uid = u.uid
+      
+      window.alert(u.email)
+      console.log('User email:', u.email)
+      console.log('Email verified:', u.emailVerified)
+      
+      await setDoc(doc(db, 'users', uid), {
+        name: nm,
+        hostel: ht,
+        role: 'student',
+        email: em
+      })
+      
+      if (u.emailVerified) {
+        toast.success('Email already verified!')
+        nav('/dashboard')
+        return
+      }
+      
+      try {
+        const actionCodeSettings = {
+          url: 'http://localhost:5173/verify-pending',
+          handleCodeInApp: true
+        }
+        await sendEmailVerification(u, actionCodeSettings)
+        toast.success('Account created. Check your email for verification.')
+        nav('/verify-pending')
+      } catch (verr) {
+        console.error('Verification error code:', verr.code)
+        console.error('Verification error:', verr.message)
+        window.alert(`Verification failed: ${verr.code} - ${verr.message}`)
+        toast.error('Failed to send verification email')
+        nav('/verify-pending')
+      }
+    } catch (err) {
+      console.error('Signup error code:', err.code)
+      console.error('Signup error:', err.message)
+      toast.error(err.message)
+    }
+    setLd(false)
+  }
 
-    return (
-        <div className='flex h-screen items-center justify-center'>
-            <div className="w-[600px]">
-                <div className="modal-box dark:bg-slate-900 dark:text-white">
-                    <form onSubmit={handleSubmit(onSubmit)}>
-                        {/* if there is a button in form, it will close the modal */}
-                        <Link to="/" className="btn btn-sm btn-circle btn-ghost absolute right-2 top-2">✕</Link>
-
-                        <h3 className="font-bold text-lg">Signup</h3>
-                        {/* Name */}
-                        <div className='mt-4 space-y-2'>
-                            <span>Name</span>
-                            <br />
-                            <input 
-                            type="text" 
-                            placeholder='Enter your full name' 
-                            className='w-80 px-3 py-1 border rounded-md outline-none dark:bg-slate-900 dark:text-white' 
-                            {...register("fullname", { required: true })}
-                            />
-                            <br />
-                            {errors.fullname && <span className='text-sm text-red-600'>This field is required</span>}
-                        </div>
-                        {/* Phone Number */}
-                        <div className='mt-4 space-y-2'>
-                            <span>Phone Number</span>
-                            <br />
-                            <input 
-                            type="string" 
-                            placeholder='Enter your Phone Number' 
-                            className='w-80 px-3 py-1 border rounded-md outline-none dark:bg-slate-900 dark:text-white' 
-                            {...register("phoneNumber", {
-                                required: "Phone number is required",
-                                pattern: { value: /^[0-9]{10}$/, message: "Invalid phone number" }
-                              })}
-                            />
-                            <br />
-                            {errors.phoneNumber && <span className='text-sm text-red-600'>{errors.phoneNumber.message}</span>}
-                        </div>
-                        {/* Password */}
-                        <div className='mt-4 space-y-2'>
-                            <span>Password</span>
-                            <br />
-                            <input 
-                            type="password" 
-                            placeholder='Enter your Phone Number' 
-                            className='w-80 px-3 py-1 border rounded-md outline-none dark:bg-slate-900 dark:text-white' 
-                            {...register("password", { required: true })}
-                            />
-                            <br />
-                            {errors.password && <span className='text-sm text-red-600'>This field is required</span>}
-                        </div>
-                        {/* Button */}
-                        <div className='flex justify-around mt-4 '>
-                            <button className='bg-pink-500 text-white rounded-md px-3 py-1 hover:bg-pink-700 duration-200'>Signup</button>
-                            <span className='text-xl'>
-                                Have an account? <button className='underline text-blue-500 cursor-pointer' onClick={() => document.getElementById('my_modal_3').showModal()}>Login</button>
-                            </span>
-                        </div>
-                    </form>
-                    <Login />
-                </div>
-            </div>
-        </div >
-    )
+  return (
+    <div className="min-h-screen bg-gray-50 flex items-center justify-center px-4">
+      <div className="max-w-md w-full bg-white rounded shadow-sm border border-gray-200 p-8">
+        <h2 className="text-2xl font-semibold text-gray-900 text-center mb-8">Sign Up</h2>
+        <form onSubmit={sub} className="space-y-5">
+          <div>
+            <input
+              type="text"
+              value={nm}
+              onChange={(e) => setNm(e.target.value)}
+              placeholder="Full Name"
+              className="w-full px-4 py-2 border border-gray-300 rounded focus:ring-1 focus:ring-blue-500 focus:border-blue-500 outline-none transition"
+              required
+            />
+          </div>
+          <div>
+            <input
+              type="email"
+              value={em}
+              onChange={(e) => setEm(e.target.value)}
+              placeholder="Email (@stu.manit.ac.in)"
+              className="w-full px-4 py-2 border border-gray-300 rounded focus:ring-1 focus:ring-blue-500 focus:border-blue-500 outline-none transition"
+              required
+            />
+          </div>
+          <div>
+            <input
+              type="text"
+              value={ht}
+              onChange={(e) => setHt(e.target.value)}
+              placeholder="Hostel"
+              className="w-full px-4 py-2 border border-gray-300 rounded focus:ring-1 focus:ring-blue-500 focus:border-blue-500 outline-none transition"
+              required
+            />
+          </div>
+          <div>
+            <input
+              type="password"
+              value={pw}
+              onChange={(e) => setPw(e.target.value)}
+              placeholder="Password"
+              className="w-full px-4 py-2 border border-gray-300 rounded focus:ring-1 focus:ring-blue-500 focus:border-blue-500 outline-none transition"
+              required
+            />
+          </div>
+          <button
+            type="submit"
+            disabled={ld}
+            className="w-full bg-blue-600 text-white py-2 px-4 rounded hover:bg-blue-700 disabled:bg-gray-400 transition duration-200"
+          >
+            {ld ? 'Creating...' : 'Sign Up'}
+          </button>
+        </form>
+      </div>
+    </div>
+  )
 }
-
-export default Signup

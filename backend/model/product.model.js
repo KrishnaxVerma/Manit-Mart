@@ -5,11 +5,20 @@ const productSchema = mongoose.Schema({
     price: { type: Number, required: true },
     category: { 
         type: String, 
-        enum: ["Accessories", "Electronics", "Books", "Stationary"], 
+        enum: ["Accessories", "Electronics", "Books", "Stationary", "Others"], 
         required: true 
     },
-    imageURL: { type: String, required: true },
-    phoneNumber: {type: Number, required: true}
+    imageUrls: [{ type: String, required: true }],
+    sellerEmail: {type: String, required: true},
+    sellerId: {type: String, required: true},
+    condition: {
+        type: String,
+        enum: ["Like New", "Good", "Fair", "Poor"],
+        default: "Good"
+    },
+    description: { type: String },
+    interested: [{ type: String }],
+    createdAt: { type: Date, default: Date.now }
 });
 
 const Product = mongoose.model("Product", productSchema);

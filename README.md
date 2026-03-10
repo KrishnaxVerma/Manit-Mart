@@ -117,7 +117,7 @@ Manit-Mart/
 
 ## 🧠 Future Enhancements
 
-- - Chat app integration planned for direct messaging between users
+- Chat app integration planned for direct messaging between users
 - Payment gateway integration
 - Admin dashboard for user and listing management
 
