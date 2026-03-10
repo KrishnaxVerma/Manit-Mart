@@ -19,12 +19,12 @@ const navItems = (
         <span className="absolute bottom-0 left-0 w-0 h-0.5 bg-pink-500 group-hover:w-full transition-all"></span>
       </Link>
     </li>
-    {/* <li key="sell" className="group">
+    <li key="sell" className="group">
       <Link to='/sell' className="px-4 py-2 text-gray-700 hover:text-pink-500 transition-colors relative">
         Sell
         <span className="absolute bottom-0 left-0 w-0 h-0.5 bg-pink-500 group-hover:w-full transition-all"></span>
       </Link>
-    </li> */}
+    </li> 
     <li key="profile" className="group">
       <Link to='/profile' className="px-4 py-2 text-gray-700 hover:text-pink-500 transition-colors relative">
         Profile
