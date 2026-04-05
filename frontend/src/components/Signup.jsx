@@ -78,7 +78,7 @@ export default function Signup() {
               value={nm}
               onChange={(e) => setNm(e.target.value)}
               placeholder="Full Name"
-              className="w-full px-4 py-2 border border-gray-300 rounded focus:ring-1 focus:ring-blue-500 focus:border-blue-500 outline-none transition"
+              className="w-full px-4 py-2 border border-gray-300 rounded focus:ring-1 focus:ring-blue-500 focus:border-blue-500 outline-none transition bg-white text-gray-900"
               required
             />
           </div>
@@ -88,7 +88,7 @@ export default function Signup() {
               value={em}
               onChange={(e) => setEm(e.target.value)}
               placeholder="Email (@stu.manit.ac.in)"
-              className="w-full px-4 py-2 border border-gray-300 rounded focus:ring-1 focus:ring-blue-500 focus:border-blue-500 outline-none transition"
+              className="w-full px-4 py-2 border border-gray-300 rounded focus:ring-1 focus:ring-blue-500 focus:border-blue-500 outline-none transition bg-white text-gray-900"
               required
             />
           </div>
@@ -98,7 +98,7 @@ export default function Signup() {
               value={ht}
               onChange={(e) => setHt(e.target.value)}
               placeholder="Hostel"
-              className="w-full px-4 py-2 border border-gray-300 rounded focus:ring-1 focus:ring-blue-500 focus:border-blue-500 outline-none transition"
+              className="w-full px-4 py-2 border border-gray-300 rounded focus:ring-1 focus:ring-blue-500 focus:border-blue-500 outline-none transition bg-white text-gray-900"
               required
             />
           </div>
@@ -108,7 +108,7 @@ export default function Signup() {
               value={pw}
               onChange={(e) => setPw(e.target.value)}
               placeholder="Password"
-              className="w-full px-4 py-2 border border-gray-300 rounded focus:ring-1 focus:ring-blue-500 focus:border-blue-500 outline-none transition"
+              className="w-full px-4 py-2 border border-gray-300 rounded focus:ring-1 focus:ring-blue-500 focus:border-blue-500 outline-none transition bg-white text-gray-900"
               required
             />
           </div>

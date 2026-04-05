@@ -11,6 +11,7 @@ import Signup from './components/Signup'
 import Login from './components/Login'
 import VerificationPending from './components/VerificationPending'
 import Contact from './components/Contact'
+import Layout from './components/Layout'
 
 export default function App() {
   const [usr, setUsr] = useState(null)
@@ -24,24 +25,44 @@ export default function App() {
     return unsub
   }, [])
 
-  if (ld) return <div className="flex items-center justify-center min-h-screen">Loading...</div>
+  useEffect(() => {
+    const theme = localStorage.getItem("theme") || "light"
+    const element = document.documentElement
+    if (theme === "dark") {
+      element.classList.add("dark")
+      document.body.classList.add("dark")
+    } else {
+      element.classList.remove("dark")
+      document.body.classList.remove("dark")
+    }
+  }, [])
+
+  if (ld) return <div className="flex items-center justify-center min-h-screen bg-white dark:bg-slate-900 dark:text-white">Loading...</div>
 
   const router = createBrowserRouter([
     { path: "/", element: <Home /> },
     { path: "/login", element: usr ? (usr.emailVerified ? <Navigate to="/dashboard" /> : <Navigate to="/verify-pending" />) : <Login /> },
     { path: "/signup", element: usr ? (usr.emailVerified ? <Navigate to="/dashboard" /> : <Navigate to="/verify-pending" />) : <Signup /> },
     { path: "/verify-pending", element: usr ? (usr.emailVerified ? <Navigate to="/dashboard" /> : <VerificationPending />) : <Navigate to="/login" /> },
-    { path: "/buy", element: usr && usr.emailVerified ? <Buy /> : <Navigate to="/login" /> },
-    { path: "/sell", element: usr && usr.emailVerified ? <Sell /> : <Navigate to="/login" /> },
-    { path: "/profile", element: usr && usr.emailVerified ? <Profile /> : <Navigate to="/login" /> },
-    { path: "/contact", element: <Contact /> },
+    { path: "/buy", element: usr && usr.emailVerified ? <Layout><Buy /></Layout> : <Navigate to="/login" /> },
+    { path: "/sell", element: usr && usr.emailVerified ? <Layout><Sell /></Layout> : <Navigate to="/login" /> },
+    { path: "/profile", element: usr && usr.emailVerified ? <Layout><Profile /></Layout> : <Navigate to="/login" /> },
+    { path: "/contact", element: <Layout><Contact /></Layout> },
     { path: "/dashboard", element: usr && usr.emailVerified ? <Home /> : <Navigate to="/login" /> }
   ])
 
   return (
-    <div className='dark:bg-slate-900 dark:text-white'>
+    <div className='min-h-screen bg-white dark:bg-slate-900 dark:text-white transition-colors duration-300'>
       <RouterProvider router={router} />
-      <Toaster />
+      <Toaster 
+        toastOptions={{
+          className: 'dark:bg-slate-800 dark:text-white',
+          style: {
+            background: 'var(--toast-bg)',
+            color: 'var(--toast-color)',
+          },
+        }}
+      />
     </div>
   )
 }

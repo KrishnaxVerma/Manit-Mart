@@ -8,31 +8,31 @@ import Logout from './Logout'
 const navItems = (
   <>
     <li key="home" className="group">
-      <Link to='/' className="px-4 py-2 text-gray-700 hover:text-pink-500 transition-colors relative">
+      <Link to='/' className="px-4 py-2 text-gray-700 dark:text-gray-300 hover:text-pink-500 transition-colors relative">
         Home
         <span className="absolute bottom-0 left-0 w-0 h-0.5 bg-pink-500 group-hover:w-full transition-all"></span>
       </Link>
     </li>
-    <li key="course" className="group">
-      <Link to='/buy' className="px-4 py-2 text-gray-700 hover:text-pink-500 transition-colors relative">
+    <li key="buy" className="group">
+      <Link to='/buy' className="px-4 py-2 text-gray-700 dark:text-gray-300 hover:text-pink-500 transition-colors relative">
         Buy
         <span className="absolute bottom-0 left-0 w-0 h-0.5 bg-pink-500 group-hover:w-full transition-all"></span>
       </Link>
     </li>
-    {/* <li key="sell" className="group">
-      <Link to='/sell' className="px-4 py-2 text-gray-700 hover:text-pink-500 transition-colors relative">
+    <li key="sell" className="group">
+      <Link to='/sell' className="px-4 py-2 text-gray-700 dark:text-gray-300 hover:text-pink-500 transition-colors relative">
         Sell
         <span className="absolute bottom-0 left-0 w-0 h-0.5 bg-pink-500 group-hover:w-full transition-all"></span>
       </Link>
-    </li> */}
+    </li>
     <li key="profile" className="group">
-      <Link to='/profile' className="px-4 py-2 text-gray-700 hover:text-pink-500 transition-colors relative">
+      <Link to='/profile' className="px-4 py-2 text-gray-700 dark:text-gray-300 hover:text-pink-500 transition-colors relative">
         Profile
         <span className="absolute bottom-0 left-0 w-0 h-0.5 bg-pink-500 group-hover:w-full transition-all"></span>
       </Link>
     </li>
     <li key="contact" className="group">
-      <Link to='/contact' className="px-4 py-2 text-gray-700 hover:text-pink-500 transition-colors relative">
+      <Link to='/contact' className="px-4 py-2 text-gray-700 dark:text-gray-300 hover:text-pink-500 transition-colors relative">
         Contact Us
         <span className="absolute bottom-0 left-0 w-0 h-0.5 bg-pink-500 group-hover:w-full transition-all"></span>
       </Link>
@@ -43,6 +43,8 @@ const navItems = (
 function Navbar() {
   const [usr, setUsr] = useState(null)
   const [theme, setTheme] = useState(localStorage.getItem("theme") || "light")
+  const [sticky, setSticky] = useState(false)
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
   const element = document.documentElement
 
   useEffect(() => {
@@ -62,8 +64,6 @@ function Navbar() {
     }
   }, [theme])
 
-  const [sticky, setSticky] = useState(false)
-
   useEffect(() => {
     const handleScroll = () => setSticky(window.scrollY > 0)
     window.addEventListener('scroll', handleScroll)
@@ -72,14 +72,17 @@ function Navbar() {
 
   return (
     <>
-      <div className={`z-50 max-w-screen-2xl container mx-auto md:px-20 px-4 dark:bg-slate-900 dark:text-white fixed top-0 left-0 right-0 ${sticky ? "sticky-navbar shadow-lg bg-white/95 dark:bg-slate-900/95 dark:text-white backdrop-blur-sm duration-300 transition-all ease-in-out" : "bg-white dark:bg-slate-900 dark:text-white"}`}>
-        <div className="navbar">
-          <div className="navbar-start">
-            <div className="dropdown">
-              <div tabIndex={0} role="button" className="btn btn-ghost lg:hidden">
+      <div className={`z-50 max-w-screen-2xl container mx-auto md:px-20 px-4 dark:bg-slate-900 dark:text-white fixed top-0 left-0 right-0 ${sticky ? "shadow-lg bg-white/95 dark:bg-slate-900/95 backdrop-blur-sm duration-300 transition-all ease-in-out" : "bg-white dark:bg-slate-900"}`}>
+        <div className="flex items-center justify-between h-16">
+          <div className="flex items-center">
+            <div className="lg:hidden">
+              <button
+                onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
+                className="p-2 rounded-md text-gray-700 dark:text-gray-300 hover:text-pink-500 hover:bg-gray-100 dark:hover:bg-slate-800"
+              >
                 <svg
                   xmlns="http://www.w3.org/2000/svg"
-                  className="h-5 w-5"
+                  className="h-6 w-6"
                   fill="none"
                   viewBox="0 0 24 24"
                   stroke="currentColor">
@@ -89,32 +92,36 @@ function Navbar() {
                     strokeWidth="2"
                     d="M4 6h16M4 12h8m-8 6h16" />
                 </svg>
-              </div>
-              <ul
-                tabIndex={0}
-                className="menu menu-sm dropdown-content bg-base-100 rounded-box z-[1] mt-3 w-52 p-2 shadow">
-                {navItems}
-              </ul>
+              </button>
+              {mobileMenuOpen && (
+                <div className="absolute top-16 left-0 w-full bg-white dark:bg-slate-800 border-b border-gray-200 dark:border-slate-700 shadow-lg">
+                  <ul className="py-2">
+                    {navItems}
+                  </ul>
+                </div>
+              )}
             </div>
-            <a className="text-2xl font-bold cursor-pointer">MANIT Mart</a>
+            <a className="text-2xl font-bold cursor-pointer text-gray-900 dark:text-white">MANIT Mart</a>
           </div>
-          <div className="navbar-end space-x-3">
-            <div className="navbar-center hidden lg:flex">
-              <ul className="menu menu-horizontal px-1">
-                {navItems}
-              </ul>
-            </div>
+          
+          <div className="hidden lg:flex items-center space-x-8">
+            <ul className="flex space-x-8">
+              {navItems}
+            </ul>
+          </div>
+
+          <div className="flex items-center space-x-4">
             <label className="swap swap-rotate">
               <input type="checkbox" className="theme-controller" checked={theme === "dark"} onChange={() => setTheme(theme === "light" ? "dark" : "light")} />
               <svg
-                className="swap-off h-7 w-7 fill-current"
+                className="swap-off h-6 w-6 fill-current"
                 xmlns="http://www.w3.org/2000/svg"
                 viewBox="0 0 24 24">
                 <path
                   d="M5.64,17l-.71.71a1,1,0,0,0,0,1.41,1,1,0,0,0,1.41,0l.71-.71A1,1,0,0,0,5.64,17ZM5,12a1,1,0,0,0-1-1H3a1,1,0,0,0,0,2H4A1,1,0,0,0,5,12Zm7-7a1,1,0,0,0,1-1V3a1,1,0,0,0-2,0V4A1,1,0,0,0,12,5ZM5.64,7.05a1,1,0,0,0,.7.29,1,1,0,0,0,.71-.29,1,1,0,0,0,0-1.41l-.71-.71A1,1,0,0,0,4.93,6.34Zm12,.29a1,1,0,0,0,.7-.29l.71-.71a1,1,0,1,0-1.41-1.41L17,5.64a1,1,0,0,0,0,1.41A1,1,0,0,0,17.66,7.34ZM21,11H20a1,1,0,0,0,0,2h1a1,1,0,0,0,0-2Zm-9,8a1,1,0,0,0-1,1v1a1,1,0,0,0,2,0V20A1,1,0,0,0,12,19ZM18.36,17A1,1,0,0,0,17,18.36l.71.71a1,1,0,0,0,1.41,0,1,1,0,0,0,0-1.41ZM12,6.5A5.5,5.5,0,1,0,17.5,12,5.51,5.51,0,0,0,12,6.5Zm0,9A3.5,3.5,0,1,1,15.5,12,3.5,3.5,0,0,1,12,15.5Z" />
               </svg>
               <svg
-                className="swap-on h-7 w-7 fill-current"
+                className="swap-on h-6 w-6 fill-current"
                 xmlns="http://www.w3.org/2000/svg"
                 viewBox="0 0 24 24">
                 <path
@@ -125,7 +132,7 @@ function Navbar() {
               <Logout />
             ) : (
               <div className="">
-                <Link to="/login" className="btn bg-black mx-3 py-2 text-white p-2 rounded hover:bg-slate-800 duration-300">Login</Link>
+                <Link to="/login" className="bg-black dark:bg-white dark:text-black text-white px-4 py-2 rounded hover:bg-slate-800 dark:hover:bg-gray-200 duration-300">Login</Link>
               </div>
             )}
           </div>

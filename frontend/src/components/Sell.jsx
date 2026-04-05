@@ -4,7 +4,6 @@ import { db, auth } from '../firebase'
 import { useNavigate } from 'react-router-dom'
 import toast from 'react-hot-toast'
 import ProductCard from './BookCard'
-import Navbar from './Navbar'
 
 export default function Sell() {
   const [products, setProducts] = useState([])
@@ -119,15 +118,13 @@ export default function Sell() {
   }
 
   return (
-    <>
-    <Navbar />
-    <div className="min-h-screen bg-gray-50 pt-20 py-8">
+    <div className="min-h-screen bg-gray-50 dark:bg-slate-900 pt-20 py-8">
       <div className="max-w-4xl mx-auto px-4">
-        <h1 className="text-3xl font-bold text-gray-900 mb-2">Sell Products</h1>
-        <p className="text-gray-600 mb-8">List your items for MANIT students</p>
+        <h1 className="text-3xl font-bold text-gray-900 dark:text-white mb-2">Sell Products</h1>
+        <p className="text-gray-600 dark:text-gray-300 mb-8">List your items for MANIT students</p>
 
-        <div className="bg-white rounded-lg border border-gray-200 p-6 mb-8">
-          <h2 className="text-xl font-semibold mb-4">
+        <div className="bg-white dark:bg-slate-800 rounded-lg border border-gray-200 dark:border-slate-700 p-6 mb-8">
+          <h2 className="text-xl font-semibold mb-4 text-gray-900 dark:text-white">
             {editingId ? 'Edit Product' : 'Add New Product'}
           </h2>
           <form onSubmit={sub} className="space-y-4">
@@ -137,13 +134,13 @@ export default function Sell() {
                 placeholder="Product Title"
                 value={frm.title}
                 onChange={(e) => setFrm({ ...frm, title: e.target.value })}
-                className="px-3 py-2 border border-gray-200 rounded focus:ring-1 focus:ring-blue-500 outline-none"
+                className="px-3 py-2 border border-gray-200 dark:border-slate-600 rounded focus:ring-1 focus:ring-blue-500 outline-none bg-white dark:bg-slate-700 text-gray-900 dark:text-white"
                 required
               />
               <select
                 value={frm.category}
                 onChange={(e) => setFrm({ ...frm, category: e.target.value })}
-                className="px-3 py-2 border border-gray-200 rounded focus:ring-1 focus:ring-blue-500 outline-none"
+                className="px-3 py-2 border border-gray-200 dark:border-slate-600 rounded focus:ring-1 focus:ring-blue-500 outline-none bg-white dark:bg-slate-700 text-gray-900 dark:text-white"
               >
                 {categories.map(cat => (
                   <option key={cat} value={cat}>{cat}</option>
@@ -156,13 +153,13 @@ export default function Sell() {
                 placeholder="Price (₹)"
                 value={frm.price}
                 onChange={(e) => setFrm({ ...frm, price: e.target.value })}
-                className="px-3 py-2 border border-gray-200 rounded focus:ring-1 focus:ring-blue-500 outline-none"
+                className="px-3 py-2 border border-gray-200 dark:border-slate-600 rounded focus:ring-1 focus:ring-blue-500 outline-none bg-white dark:bg-slate-700 text-gray-900 dark:text-white"
                 required
               />
               <select
                 value={frm.condition}
                 onChange={(e) => setFrm({ ...frm, condition: e.target.value })}
-                className="px-3 py-2 border border-gray-200 rounded focus:ring-1 focus:ring-blue-500 outline-none"
+                className="px-3 py-2 border border-gray-200 dark:border-slate-600 rounded focus:ring-1 focus:ring-blue-500 outline-none bg-white dark:bg-slate-700 text-gray-900 dark:text-white"
               >
                 <option value="Like New">Like New</option>
                 <option value="Good">Good</option>
@@ -172,7 +169,7 @@ export default function Sell() {
             </div>
             
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">Product Images (Drive Links)</label>
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Product Images (Drive Links)</label>
               {frm.imageUrls.map((url, index) => (
                 <div key={index} className="flex gap-2 mb-2">
                   <input
@@ -180,7 +177,7 @@ export default function Sell() {
                     placeholder={`Drive Link ${index + 1}`}
                     value={url}
                     onChange={(e) => updateImageUrl(index, e.target.value)}
-                    className="flex-1 px-3 py-2 border border-gray-200 rounded focus:ring-1 focus:ring-blue-500 outline-none"
+                    className="flex-1 px-3 py-2 border border-gray-200 dark:border-slate-600 rounded focus:ring-1 focus:ring-blue-500 outline-none bg-white dark:bg-slate-700 text-gray-900 dark:text-white"
                   />
                   {frm.imageUrls.length > 1 && (
                     <button
@@ -206,7 +203,7 @@ export default function Sell() {
               placeholder="Description (optional)"
               value={frm.description}
               onChange={(e) => setFrm({ ...frm, description: e.target.value })}
-              className="w-full px-3 py-2 border border-gray-200 rounded focus:ring-1 focus:ring-blue-500 outline-none"
+              className="w-full px-3 py-2 border border-gray-200 dark:border-slate-600 rounded focus:ring-1 focus:ring-blue-500 outline-none bg-white dark:bg-slate-700 text-gray-900 dark:text-white"
               rows="3"
             />
             <div className="flex gap-2">
@@ -231,9 +228,9 @@ export default function Sell() {
         </div>
 
         <div>
-          <h2 className="text-xl font-semibold mb-4">Your Listings ({products.length})</h2>
+          <h2 className="text-xl font-semibold mb-4 text-gray-900 dark:text-white">Your Listings ({products.length})</h2>
           {products.length === 0 ? (
-            <p className="text-gray-500 text-center py-8">No products listed yet</p>
+            <p className="text-gray-500 dark:text-gray-400 text-center py-8">No products listed yet</p>
           ) : (
             <div className="space-y-4">
               {products.map(product => (
@@ -260,6 +257,5 @@ export default function Sell() {
         </div>
       </div>
     </div>
-  </>
   )
 }

@@ -3,13 +3,13 @@ import { getAuth, GoogleAuthProvider, sendEmailVerification } from 'firebase/aut
 import { getFirestore } from 'firebase/firestore'
 
 const cfg = {
-  apiKey: "AIzaSyDUIoYDlCMIXxemITGe_B8D3wxvCc7est8",
-  authDomain: "manit-mart.firebaseapp.com",
-  projectId: "manit-mart",
-  storageBucket: "manit-mart.firebasestorage.app",
-  messagingSenderId: "112543678583",
-  appId: "1:112543678583:web:c60a787340a6be23dbc672",
-  measurementId: "G-SV0PEQGK0B"
+  apiKey: import.meta.env.VITE_FIREBASE_API_KEY,
+  authDomain: import.meta.env.VITE_FIREBASE_AUTH_DOMAIN,
+  projectId: import.meta.env.VITE_FIREBASE_PROJECT_ID,
+  storageBucket: import.meta.env.VITE_FIREBASE_STORAGE_BUCKET,
+  messagingSenderId: import.meta.env.VITE_FIREBASE_MESSAGING_SENDER_ID,
+  appId: import.meta.env.VITE_FIREBASE_APP_ID,
+  measurementId: import.meta.env.VITE_FIREBASE_MEASUREMENT_ID
 }
 
 const app = initializeApp(cfg)

@@ -1,7 +1,6 @@
 import { useState, useEffect } from 'react'
 import { doc, getDoc, updateDoc } from 'firebase/firestore'
 import { auth, db } from '../firebase'
-import Navbar from './Navbar'
 import { useNavigate } from 'react-router-dom'
 import toast from 'react-hot-toast'
 
@@ -65,92 +64,89 @@ export default function Profile() {
   if (!u) return null
 
   return (
-    <>
-      <Navbar />
-      <div className="min-h-screen bg-gray-50 pt-20">
-        <div className="max-w-2xl mx-auto px-4 py-8">
-          <div className="bg-white rounded-lg border border-gray-200 p-8">
-            <h2 className="text-2xl font-semibold text-gray-900 mb-6">Profile</h2>
-            
-            <div className="space-y-6">
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">Name</label>
-                {isEd ? (
-                  <input
-                    type="text"
-                    value={frm.name}
-                    onChange={(e) => setFrm({ ...frm, name: e.target.value })}
-                    className="w-full px-2 py-1 border border-gray-200 rounded focus:ring-1 focus:ring-blue-500 focus:border-blue-500 outline-none"
-                  />
-                ) : (
-                  <div className="px-3 py-2 border border-gray-300 rounded-lg bg-gray-50">
-                    {prof?.name || 'Not set'}
-                  </div>
-                )}
-              </div>
-              
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">Email</label>
-                <input
-                  type="email"
-                  value={u.email}
-                  disabled
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg bg-gray-100 text-gray-500 cursor-not-allowed"
-                />
-              </div>
-              
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">Hostel</label>
-                {isEd ? (
-                  <input
-                    type="text"
-                    value={frm.hostel}
-                    onChange={(e) => setFrm({ ...frm, hostel: e.target.value })}
-                    className="w-full px-2 py-1 border border-gray-200 rounded focus:ring-1 focus:ring-blue-500 focus:border-blue-500 outline-none"
-                  />
-                ) : (
-                  <div className="px-3 py-2 border border-gray-300 rounded-lg bg-gray-50">
-                    {prof?.hostel || 'Not set'}
-                  </div>
-                )}
-              </div>
-              
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">Role</label>
-                <div className="px-3 py-2 border border-gray-300 rounded-lg bg-gray-50">
-                  {prof?.role || 'student'}
-                </div>
-              </div>
-            </div>
-            
-            <div className="mt-6 flex gap-3">
+    <div className="min-h-screen bg-gray-50 dark:bg-slate-900 pt-20">
+      <div className="max-w-2xl mx-auto px-4 py-8">
+        <div className="bg-white dark:bg-slate-800 rounded-lg border border-gray-200 dark:border-slate-700 p-8">
+          <h2 className="text-2xl font-semibold text-gray-900 dark:text-white mb-6">Profile</h2>
+          
+          <div className="space-y-6">
+            <div>
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Name</label>
               {isEd ? (
-                <>
-                  <button
-                    onClick={save}
-                    className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition"
-                  >
-                    Save
-                  </button>
-                  <button
-                    onClick={cancel}
-                    className="px-4 py-2 bg-gray-600 text-white rounded-lg hover:bg-gray-700 transition"
-                  >
-                    Cancel
-                  </button>
-                </>
+                <input
+                  type="text"
+                  value={frm.name}
+                  onChange={(e) => setFrm({ ...frm, name: e.target.value })}
+                  className="w-full px-2 py-1 border border-gray-200 dark:border-slate-600 rounded focus:ring-1 focus:ring-blue-500 focus:border-blue-500 outline-none bg-white dark:bg-slate-700 text-gray-900 dark:text-white"
+                />
               ) : (
-                <button
-                  onClick={() => setIsEd(true)}
-                  className="px-4 py-2 bg-pink-500 text-white rounded-lg hover:bg-pink-600 transition"
-                >
-                  Edit
-                </button>
+                <div className="px-3 py-2 border border-gray-300 dark:border-slate-600 rounded-lg bg-gray-50 dark:bg-slate-700 text-gray-900 dark:text-white">
+                  {prof?.name || 'Not set'}
+                </div>
               )}
             </div>
+            
+            <div>
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Email</label>
+              <input
+                type="email"
+                value={u.email}
+                disabled
+                className="w-full px-3 py-2 border border-gray-300 dark:border-slate-600 rounded-lg bg-gray-100 dark:bg-slate-700 text-gray-500 dark:text-gray-400 cursor-not-allowed"
+              />
+            </div>
+            
+            <div>
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Hostel</label>
+              {isEd ? (
+                <input
+                  type="text"
+                  value={frm.hostel}
+                  onChange={(e) => setFrm({ ...frm, hostel: e.target.value })}
+                  className="w-full px-2 py-1 border border-gray-200 dark:border-slate-600 rounded focus:ring-1 focus:ring-blue-500 focus:border-blue-500 outline-none bg-white dark:bg-slate-700 text-gray-900 dark:text-white"
+                />
+              ) : (
+                <div className="px-3 py-2 border border-gray-300 dark:border-slate-600 rounded-lg bg-gray-50 dark:bg-slate-700 text-gray-900 dark:text-white">
+                  {prof?.hostel || 'Not set'}
+                </div>
+              )}
+            </div>
+            
+            <div>
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Role</label>
+              <div className="px-3 py-2 border border-gray-300 dark:border-slate-600 rounded-lg bg-gray-50 dark:bg-slate-700 text-gray-900 dark:text-white">
+                {prof?.role || 'student'}
+              </div>
+            </div>
+          </div>
+          
+          <div className="mt-6 flex gap-3">
+            {isEd ? (
+              <>
+                <button
+                  onClick={save}
+                  className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition"
+                >
+                  Save
+                </button>
+                <button
+                  onClick={cancel}
+                  className="px-4 py-2 bg-gray-600 text-white rounded-lg hover:bg-gray-700 transition"
+                >
+                  Cancel
+                </button>
+              </>
+            ) : (
+              <button
+                onClick={() => setIsEd(true)}
+                className="px-4 py-2 bg-pink-500 text-white rounded-lg hover:bg-pink-600 transition"
+              >
+                Edit
+              </button>
+            )}
           </div>
         </div>
       </div>
-    </>
+    </div>
   )
 }

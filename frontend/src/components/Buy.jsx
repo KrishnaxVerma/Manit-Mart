@@ -3,7 +3,6 @@ import { collection, query, orderBy, onSnapshot, where } from 'firebase/firestor
 import { db, auth } from '../firebase'
 import { useNavigate } from 'react-router-dom'
 import ProductCard from './BookCard'
-import Navbar from './Navbar'
 
 export default function Buy() {
   const [products, setProducts] = useState([])
@@ -65,26 +64,24 @@ export default function Buy() {
   if (ld) return <div className="flex items-center justify-center min-h-screen">Loading...</div>
 
   return (
-    <>
-    <Navbar />
-    <div className="min-h-screen bg-gray-50 pt-20 py-8">
+    <div className="min-h-screen bg-gray-50 dark:bg-slate-900 pt-20 py-8">
       <div className="max-w-6xl mx-auto px-4">
-        <h1 className="text-3xl font-bold text-gray-900 mb-2">Buy Products</h1>
-        <p className="text-gray-600 mb-8">Find items from MANIT students</p>
+        <h1 className="text-3xl font-bold text-gray-900 dark:text-white mb-2">Buy Products</h1>
+        <p className="text-gray-600 dark:text-gray-300 mb-8">Find items from MANIT students</p>
 
-        <div className="bg-white rounded-lg border border-gray-200 p-6 mb-8">
+        <div className="bg-white dark:bg-slate-800 rounded-lg border border-gray-200 dark:border-slate-700 p-6 mb-8">
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4">
             <input
               type="text"
               placeholder="Search products..."
               value={search}
               onChange={(e) => setSearch(e.target.value)}
-              className="px-3 py-2 border border-gray-200 rounded focus:ring-1 focus:ring-blue-500 outline-none"
+              className="px-3 py-2 border border-gray-200 dark:border-slate-600 rounded focus:ring-1 focus:ring-blue-500 outline-none bg-white dark:bg-slate-700 text-gray-900 dark:text-white"
             />
             <select
               value={category}
               onChange={(e) => setCategory(e.target.value)}
-              className="px-3 py-2 border border-gray-200 rounded focus:ring-1 focus:ring-blue-500 outline-none"
+              className="px-3 py-2 border border-gray-200 dark:border-slate-600 rounded focus:ring-1 focus:ring-blue-500 outline-none bg-white dark:bg-slate-700 text-gray-900 dark:text-white"
             >
               {categories.map(cat => (
                 <option key={cat} value={cat}>{cat}</option>
@@ -93,7 +90,7 @@ export default function Buy() {
             <select
               value={cond}
               onChange={(e) => setCond(e.target.value)}
-              className="px-3 py-2 border border-gray-200 rounded focus:ring-1 focus:ring-blue-500 outline-none"
+              className="px-3 py-2 border border-gray-200 dark:border-slate-600 rounded focus:ring-1 focus:ring-blue-500 outline-none bg-white dark:bg-slate-700 text-gray-900 dark:text-white"
             >
               <option value="All">All Conditions</option>
               <option value="Like New">Like New</option>
@@ -107,26 +104,26 @@ export default function Buy() {
                 placeholder="Min"
                 value={priceRange.min}
                 onChange={(e) => setPriceRange({ ...priceRange, min: e.target.value })}
-                className="w-24 px-3 py-2 border border-gray-200 rounded focus:ring-1 focus:ring-blue-500 outline-none"
+                className="w-24 px-3 py-2 border border-gray-200 dark:border-slate-600 rounded focus:ring-1 focus:ring-blue-500 outline-none bg-white dark:bg-slate-700 text-gray-900 dark:text-white"
               />
               <input
                 type="number"
                 placeholder="Max"
                 value={priceRange.max}
                 onChange={(e) => setPriceRange({ ...priceRange, max: e.target.value })}
-                className="w-24 px-3 py-2 border border-gray-200 rounded focus:ring-1 focus:ring-blue-500 outline-none"
+                className="w-24 px-3 py-2 border border-gray-200 dark:border-slate-600 rounded focus:ring-1 focus:ring-blue-500 outline-none bg-white dark:bg-slate-700 text-gray-900 dark:text-white"
               />
             </div>
           </div>
         </div>
 
-        <div className="mb-4 text-sm text-gray-600">
+        <div className="mb-4 text-sm text-gray-600 dark:text-gray-300">
           Showing {filtered.length} of {products.length} products
         </div>
 
         {filtered.length === 0 ? (
           <div className="text-center py-16">
-            <p className="text-gray-500">No products found matching your criteria</p>
+            <p className="text-gray-500 dark:text-gray-400">No products found matching your criteria</p>
           </div>
         ) : (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
@@ -145,6 +142,5 @@ export default function Buy() {
         )}
       </div>
     </div>
-  </>
   )
 }

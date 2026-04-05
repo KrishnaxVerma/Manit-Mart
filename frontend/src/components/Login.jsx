@@ -34,7 +34,7 @@ export default function Login() {
               value={em}
               onChange={(e) => setEm(e.target.value)}
               placeholder="Email"
-              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-1 focus:ring-blue-500 focus:border-blue-500 outline-none transition"
+              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-1 focus:ring-blue-500 focus:border-blue-500 outline-none transition bg-white text-gray-900"
               required
             />
           </div>
@@ -44,7 +44,7 @@ export default function Login() {
               value={pw}
               onChange={(e) => setPw(e.target.value)}
               placeholder="Password"
-              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-1 focus:ring-blue-500 focus:border-blue-500 outline-none transition"
+              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-1 focus:ring-blue-500 focus:border-blue-500 outline-none transition bg-white"
               required
             />
           </div>

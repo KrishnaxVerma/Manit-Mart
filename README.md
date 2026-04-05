@@ -1,6 +1,6 @@
 # MANIT Mart
 
-**MANIT Mart** is a MERN-based online marketplace designed specifically for college students to buy and sell products within their campus community. The application offers a smooth and secure user experience with features like authentication, profile management, dark mode, and product listing filters.
+**MANIT Mart** is a modern React-based online marketplace designed specifically for college students to buy and sell products within their campus community. The application offers a smooth and secure user experience with features like Firebase authentication, real-time database, dark mode, and product listing filters.
 
 ---
 
@@ -15,31 +15,42 @@
 
 | Technology     | Description                                  |
 |----------------|----------------------------------------------|
-| MongoDB        | NoSQL Database for storing user/product data |
-| Express.js     | Backend web framework                        |
 | React.js       | Frontend library for building UI             |
-| Node.js        | JavaScript runtime for the backend           |
-| bcrypt.js      | Password hashing and authentication          |
+| Firebase       | Backend-as-a-Service (Auth, Firestore, Storage) |
+| React Router   | Client-side routing for SPA                  |
 | Tailwind CSS   | Utility-first CSS framework                  |
+| React Hot Toast| Toast notifications for user feedback       |
+| Vite           | Fast build tool and development server       |
 
 ---
 
 ## ✨ Features
 
-- 🔐 **User Authentication**  
-  - Secure password storage using `bcrypt.js`  
+- 🔐 **Firebase Authentication**  
+  - Email/password authentication with email verification  
+  - Secure session management  
 
 - 👤 **Profile Management**  
-  - Users can update personal information  
+  - Users can update personal information (name, hostel)  
   - View and manage their listed products  
 
 - 🛒 **Product Listings**  
   - Post, update, and delete product listings  
   - View listings from other users  
-  - **Filter products by category** for easier browsing  
+  - **Filter products by category, condition, and price range**  
+  - Mark products as "interested"  
+  - Multiple image support per product  
 
 - 🌙 **Dark Mode Support**  
   - Toggle between light and dark themes for better accessibility  
+  - Persistent theme preference using localStorage  
+
+- 📱 **Responsive Design**  
+  - Mobile-first approach with Tailwind CSS  
+  - Optimized for all screen sizes  
+
+- 📧 **Contact Form**  
+  - Integrated with Web3Forms for user inquiries  
 
 ---
 
@@ -49,18 +60,29 @@
 Manit-Mart/
 ├── frontend/               # React frontend
 │   ├── src/
-│   │   ├── components/
-│   │   ├── pages/
-│   │   ├── context/
-│   │   ├── App.jsx
-│   │   └── main.jsx
+│   │   ├── components/     # Reusable UI components
+│   │   │   ├── Navbar.jsx
+│   │   │   ├── Banner.jsx
+│   │   │   ├── Buy.jsx
+│   │   │   ├── Sell.jsx
+│   │   │   ├── Profile.jsx
+│   │   │   ├── BookCard.jsx
+│   │   │   ├── Login.jsx
+│   │   │   ├── Signup.jsx
+│   │   │   ├── Contact.jsx
+│   │   │   └── Footer.jsx
+│   │   ├── Home/           # Home page components
+│   │   │   └── Home.jsx
+│   │   ├── App.jsx         # Main app component with routing
+│   │   ├── main.jsx        # App entry point
+│   │   ├── firebase.js     # Firebase configuration
+│   │   └── index.css       # Global styles
+│   ├── public/             # Static assets
+│   │   └── collegelogo.png
+│   ├── package.json
+│   ├── vite.config.js
 │   └── tailwind.config.js
-├── backend/                # Node.js + Express backend
-│   ├── controllers/
-│   ├── models/
-│   ├── routes/
-│   ├── middleware/
-│   └── index.js
+├── seed.html               # Firestore data seeding tool
 └── README.md
 ```
 
@@ -71,7 +93,7 @@ Manit-Mart/
 ### Prerequisites
 
 - Node.js and npm installed
-- MongoDB Atlas account or local MongoDB instance
+- Firebase account and project setup
 
 ### Installation
 
@@ -82,44 +104,58 @@ Manit-Mart/
    cd Manit-Mart
    ```
 
-2. **Set up the backend:**
+2. **Set up Firebase:**
 
-   ```bash
-   cd backend
-   npm install
-   touch .env
-   ```
+   - Create a new Firebase project at [Firebase Console](https://console.firebase.google.com/)
+   - Enable Authentication (Email/Password method)
+   - Create Firestore Database
+   - Get your Firebase configuration
 
-   Inside `.env`:
-
-   ```env
-   MONGO_URI=your_mongodb_connection_string
-   ```
-
-   Start the backend server:
-
-   ```bash
-   npm start
-   ```
-
-3. **Set up the frontend:**
+3. **Configure the frontend:**
 
    ```bash
    cd frontend
    npm install
+   ```
+
+   Create `.env` file in the frontend directory:
+
+   ```env
+   VITE_FIREBASE_API_KEY=your_api_key
+   VITE_FIREBASE_AUTH_DOMAIN=your_project.firebaseapp.com
+   VITE_FIREBASE_PROJECT_ID=your_project_id
+   VITE_FIREBASE_STORAGE_BUCKET=your_project.appspot.com
+   VITE_FIREBASE_MESSAGING_SENDER_ID=your_sender_id
+   VITE_FIREBASE_APP_ID=your_app_id
+   VITE_ACCESS_KEY=your_web3forms_access_key
+   ```
+
+4. **Start the development server:**
+
+   ```bash
    npm run dev
    ```
 
-4. Open the app at:  
+5. Open the app at:  
    [http://localhost:5173](http://localhost:5173)
+
+---
+
+## 🌐 Firebase Services Used
+
+- **Authentication**: User signup, login, and email verification
+- **Firestore**: Real-time database for users and products
+- **Storage**: Image storage for product photos (optional)
 
 ---
 
 ## 🧠 Future Enhancements
 
-- Chat app integration planned for direct messaging between users
+- Real-time chat between buyers and sellers
 - Payment gateway integration
-- Admin dashboard for user and listing management
+- Push notifications for new listings
+- Admin dashboard for content moderation
+- Mobile app development
 
 ---
 
