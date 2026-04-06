@@ -1,17 +1,24 @@
 import React, { useState, useEffect } from 'react'
 import { Link } from 'react-router-dom'
-import { collection, query, orderBy, limit, onSnapshot } from 'firebase/firestore'
+import { collection, onSnapshot } from 'firebase/firestore'
 import { db } from '../firebase'
 import logo from "../../public/collegelogo.png"
+import { getProductImages } from '../utils/productImages'
 
 export default function Banner() {
   const [stats, setStats] = useState({ products: 0, sellers: 0, categories: 0 })
   const [recent, setRecent] = useState([])
 
   useEffect(() => {
-    const q = query(collection(db, 'products'), orderBy('createdAt', 'desc'), limit(3))
-    const unsub = onSnapshot(q, (snap) => {
-      const data = snap.docs.map(doc => ({ id: doc.id, ...doc.data() }))
+    const unsub = onSnapshot(collection(db, 'products'), (snap) => {
+      const data = snap.docs
+        .map(doc => ({ id: doc.id, ...doc.data() }))
+        .sort((a, b) => {
+          const aTime = a.createdAt?.toDate?.()?.getTime?.() ?? 0
+          const bTime = b.createdAt?.toDate?.()?.getTime?.() ?? 0
+          return bTime - aTime
+        })
+        .slice(0, 3)
       setRecent(data)
       setStats({
         products: Math.floor(Math.random() * 50) + 150,
@@ -73,13 +80,15 @@ export default function Banner() {
           <div className='mt-16'>
             <h2 className='text-2xl font-bold text-gray-900 dark:text-white mb-6'>Latest on Campus</h2>
             <div className='grid grid-cols-1 md:grid-cols-3 gap-6'>
-              {recent.map(item => (
+              {recent.map(item => {
+                const images = getProductImages(item)
+                return (
                 <Link key={item.id} to="/buy" className='group'>
                   <div className='bg-white dark:bg-slate-800 rounded-xl p-4 shadow-md hover:shadow-lg transition-all hover:scale-105 cursor-pointer'>
                     <div className='flex gap-4'>
                       <div className='w-16 h-16 bg-gray-200 dark:bg-slate-700 rounded-lg flex items-center justify-center flex-shrink-0'>
-                        {item.imageUrls?.[0] ? (
-                          <img src={item.imageUrls[0]} alt={item.title} className='w-full h-full object-cover rounded-lg' />
+                        {images[0] ? (
+                          <img src={images[0]} alt={item.title} className='w-full h-full object-cover rounded-lg' />
                         ) : (
                           <span className='text-gray-400 dark:text-gray-500 text-xs'>No img</span>
                         )}
@@ -92,7 +101,8 @@ export default function Banner() {
                     </div>
                   </div>
                 </Link>
-              ))}
+                )
+              })}
             </div>
           </div>
         )}

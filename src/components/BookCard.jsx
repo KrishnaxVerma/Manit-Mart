@@ -1,41 +1,21 @@
 import { useState } from 'react'
-import { doc, updateDoc, arrayUnion, arrayRemove } from 'firebase/firestore'
-import { db, auth } from '../firebase'
-import toast from 'react-hot-toast'
+import { getOptimizedCloudinaryUrl, getProductImages } from '../utils/productImages'
 
-export default function ProductCard({ product, onInterested }) {
-  const [ld, setLd] = useState(false)
+export default function ProductCard({ product }) {
   const [currentImg, setCurrentImg] = useState(0)
   const [showAllImages, setShowAllImages] = useState(false)
-  const u = auth.currentUser
-
-  const handleInterested = async () => {
-    if (!u) return
-    setLd(true)
-    try {
-      const productRef = doc(db, 'products', product.id)
-      
-      if (product.interested?.includes(u?.uid)) {
-        await updateDoc(productRef, {
-          interested: arrayRemove(u.uid)
-        })
-        toast.success('Removed from interested')
-      } else {
-        await updateDoc(productRef, {
-          interested: arrayUnion(u.uid)
-        })
-        toast.success('Marked as interested')
-      }
-      
-      onInterested(product.id)
-    } catch (err) {
-      toast.error('Failed to update')
-    }
-    setLd(false)
-  }
-
-  const isInterested = product.interested?.includes(u?.uid)
-  const images = product.imageUrls || []
+  const images = getProductImages(product)
+  const galleryImages = images.map((image) =>
+    getOptimizedCloudinaryUrl(image, 'w_400,c_scale')
+  )
+  const sellerEmail = product.sellerEmail?.trim() || ''
+  const subject = encodeURIComponent(`Interested in buying ${product.title} - MANIT Mart`)
+  const body = encodeURIComponent(
+    `Hi, I saw your listing for '${product.title}' on MANIT Mart and I am interested in buying it. Is it still available?`
+  )
+  const contactHref = sellerEmail
+    ? `https://mail.google.com/mail/?view=cm&fs=1&to=${encodeURIComponent(sellerEmail)}&su=${subject}&body=${body}`
+    : null
 
   const nextImg = () => {
     setCurrentImg((prev) => (prev + 1) % images.length)
@@ -55,7 +35,7 @@ export default function ProductCard({ product, onInterested }) {
           {images.length > 0 ? (
             <>
               <img 
-                src={images[currentImg]} 
+                src={galleryImages[currentImg]} 
                 alt={product.title}
                 className="w-full h-full object-cover rounded"
                 onError={(e) => {
@@ -100,22 +80,28 @@ export default function ProductCard({ product, onInterested }) {
             <span className="text-lg font-bold text-blue-600 dark:text-blue-400">₹{product.price}</span>
             <span className="text-xs text-gray-500 dark:text-gray-400">{product.condition}</span>
           </div>
-          <div className="flex items-center justify-between mt-3">
+          <div className="mt-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
             <span className="text-xs text-gray-500 dark:text-gray-400">{product.sellerName}</span>
-            <button
-              onClick={(e) => {
-                e.stopPropagation()
-                handleInterested()
-              }}
-              disabled={ld || !u}
-              className={`px-3 py-1 rounded text-sm transition ${
-                isInterested 
-                  ? 'bg-red-500 text-white hover:bg-red-600' 
-                  : 'bg-pink-500 text-white hover:bg-pink-600 disabled:bg-gray-300 dark:disabled:bg-gray-600'
-              }`}
-            >
-              {ld ? '...' : isInterested ? 'Undo Interested' : 'Interested'}
-            </button>
+            {contactHref ? (
+              <a
+                href={contactHref}
+                target="_blank"
+                rel="noreferrer"
+                onClick={(e) => e.stopPropagation()}
+                className="inline-flex w-full items-center justify-center gap-2 rounded-lg bg-red-500 px-4 py-2 text-sm font-medium text-white transition hover:bg-red-600 sm:w-auto"
+              >
+                <svg
+                  aria-hidden="true"
+                  viewBox="0 0 24 24"
+                  className="h-4 w-4 fill-current"
+                >
+                  <path d="M20 4H4a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V6a2 2 0 0 0-2-2Zm0 4.24-8 5.33-8-5.33V6l8 5.33L20 6v2.24Z" />
+                </svg>
+                Contact Seller
+              </a>
+            ) : (
+              <span className="text-xs text-gray-400 dark:text-gray-500">Seller email unavailable</span>
+            )}
           </div>
         </div>
       </div>
@@ -141,7 +127,7 @@ export default function ProductCard({ product, onInterested }) {
                     {images.map((img, index) => (
                       <div key={index} className="relative">
                         <img
-                          src={img}
+                          src={galleryImages[index]}
                           alt={`${product.title} ${index + 1}`}
                           className="w-full h-32 object-cover rounded"
                         />
@@ -177,25 +163,35 @@ export default function ProductCard({ product, onInterested }) {
                       <p className="text-gray-700 dark:text-gray-300">{product.description || 'No description provided'}</p>
                     </div>
                     <div>
-                      <span className="text-sm text-gray-500 dark:text-gray-400">Interested Users:</span>
-                      <p className="font-medium text-gray-900 dark:text-white">{product.interested?.length || 0} people interested</p>
+                      <span className="text-sm text-gray-500 dark:text-gray-400">Seller Email:</span>
+                      <p className="font-medium text-gray-900 dark:text-white">{sellerEmail || 'Not available'}</p>
                     </div>
                   </div>
                 </div>
               </div>
               
               <div className="mt-6 flex gap-3">
-                <button
-                  onClick={handleInterested}
-                  disabled={ld || !u}
-                  className={`flex-1 px-4 py-2 rounded font-medium transition ${
-                    isInterested 
-                      ? 'bg-red-500 text-white hover:bg-red-600' 
-                      : 'bg-pink-500 text-white hover:bg-pink-600 disabled:bg-gray-300 dark:disabled:bg-gray-600'
-                  }`}
-                >
-                  {ld ? '...' : isInterested ? 'Undo Interested' : 'Mark as Interested'}
-                </button>
+                {contactHref ? (
+                  <a
+                    href={contactHref}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="inline-flex flex-1 items-center justify-center gap-2 rounded-lg bg-red-500 px-4 py-3 font-medium text-white transition hover:bg-red-600"
+                  >
+                    <svg
+                      aria-hidden="true"
+                      viewBox="0 0 24 24"
+                      className="h-5 w-5 fill-current"
+                    >
+                      <path d="M20 4H4a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V6a2 2 0 0 0-2-2Zm0 4.24-8 5.33-8-5.33V6l8 5.33L20 6v2.24Z" />
+                    </svg>
+                    Contact Seller
+                  </a>
+                ) : (
+                  <div className="flex-1 rounded-lg bg-gray-100 px-4 py-3 text-center text-sm text-gray-500 dark:bg-slate-700 dark:text-gray-300">
+                    Seller email unavailable
+                  </div>
+                )}
                 <button
                   onClick={() => setShowAllImages(false)}
                   className="px-6 py-2 bg-gray-500 text-white rounded hover:bg-gray-600 transition"
