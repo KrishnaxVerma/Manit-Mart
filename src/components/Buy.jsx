@@ -12,6 +12,7 @@ import { useNavigate } from 'react-router-dom'
 import ProductCard from './BookCard'
 
 const PAGE_SIZE = 20
+const FILTER_RESULTS_BATCH_SIZE = 5
 const DEFAULT_FILTERS = {
   search: '',
   category: 'All',
@@ -27,11 +28,18 @@ export default function Buy() {
   const [loadingMore, setLoadingMore] = useState(false)
   const [lastVisible, setLastVisible] = useState(null)
   const [hasMore, setHasMore] = useState(false)
-  const [visibleCount, setVisibleCount] = useState(PAGE_SIZE)
+  const [visibleCount, setVisibleCount] = useState(FILTER_RESULTS_BATCH_SIZE)
   const nav = useNavigate()
   const requestIdRef = useRef(0)
 
   const categories = ['All', 'Books', 'Electronics', 'Accessories', 'Stationary', 'Others']
+
+  const hasAnyFilterValue = (filters) =>
+    filters.search.trim() !== '' ||
+    filters.category !== 'All' ||
+    filters.cond !== 'All' ||
+    filters.priceRange.min !== '' ||
+    filters.priceRange.max !== ''
 
   const buildProductsQuery = (cursor = null, pageLimit = PAGE_SIZE) => {
     const constraints = []
@@ -89,7 +97,7 @@ export default function Buy() {
     setProducts([])
     setLastVisible(null)
     setHasMore(false)
-    setVisibleCount(PAGE_SIZE)
+    setVisibleCount(FILTER_RESULTS_BATCH_SIZE)
   }
 
   const updateHasMoreState = async (cursor, currentRequestId) => {
@@ -181,10 +189,7 @@ export default function Buy() {
   ])
 
   const applyFilters = () => {
-    requestIdRef.current += 1
-    setLd(true)
-    resetPaginationState()
-    setActiveFilters({
+    const nextFilters = {
       search: tempFilters.search,
       category: tempFilters.category,
       cond: tempFilters.cond,
@@ -192,7 +197,25 @@ export default function Buy() {
         min: tempFilters.priceRange.min,
         max: tempFilters.priceRange.max,
       },
-    })
+    }
+
+    if (!hasAnyFilterValue(nextFilters)) {
+      if (!hasAnyFilterValue(activeFilters)) {
+        setVisibleCount(FILTER_RESULTS_BATCH_SIZE)
+        return
+      }
+
+      requestIdRef.current += 1
+      setLd(true)
+      resetPaginationState()
+      setActiveFilters(DEFAULT_FILTERS)
+      return
+    }
+
+    requestIdRef.current += 1
+    setLd(true)
+    resetPaginationState()
+    setActiveFilters(nextFilters)
   }
 
   const clearAllFilters = () => {
@@ -328,7 +351,7 @@ export default function Buy() {
             <button
               onClick={() => {
                 if (canLoadMoreFilteredProducts) {
-                  setVisibleCount((current) => current + PAGE_SIZE)
+                  setVisibleCount((current) => current + FILTER_RESULTS_BATCH_SIZE)
                   return
                 }
 
