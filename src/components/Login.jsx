@@ -1,5 +1,9 @@
 import { useState } from 'react'
-import { signInWithEmailAndPassword } from 'firebase/auth'
+import {
+  browserSessionPersistence,
+  setPersistence,
+  signInWithEmailAndPassword,
+} from 'firebase/auth'
 import { auth } from '../firebase'
 import { useNavigate, Link } from 'react-router-dom'
 import toast from 'react-hot-toast'
@@ -14,6 +18,7 @@ export default function Login() {
     e.preventDefault()
     setLd(true)
     try {
+      await setPersistence(auth, browserSessionPersistence)
       await signInWithEmailAndPassword(auth, em, pw)
       toast.success('Logged in')
       nav('/dashboard')

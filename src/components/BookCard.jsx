@@ -26,9 +26,9 @@ export default function ProductCard({ product }) {
   }
 
   return (
-    <div className="bg-white dark:bg-slate-800 rounded-lg border border-gray-200 dark:border-slate-700 p-4 hover:shadow-md transition cursor-pointer">
+    <div className="flex h-full cursor-pointer flex-col rounded-lg border border-gray-200 bg-white p-4 transition hover:shadow-md dark:border-slate-700 dark:bg-slate-800">
       <div 
-        className="flex gap-4"
+        className="flex h-full gap-4"
         onClick={() => setShowAllImages(true)}
       >
         <div className="relative w-24 h-32 bg-gray-200 dark:bg-slate-700 rounded flex items-center justify-center overflow-hidden">
@@ -72,7 +72,7 @@ export default function ProductCard({ product }) {
             <span className="text-gray-400 dark:text-gray-500 text-xs">No Images</span>
           )}
         </div>
-        <div className="flex-1">
+        <div className="flex flex-1 flex-col">
           <h3 className="font-semibold text-gray-900 dark:text-white mb-1">{product.title}</h3>
           <p className="text-sm text-gray-600 dark:text-gray-300 mb-2">{product.category}</p>
           <p className="text-sm text-gray-500 dark:text-gray-400 mb-2">{product.description?.substring(0, 50)}...</p>
@@ -80,7 +80,7 @@ export default function ProductCard({ product }) {
             <span className="text-lg font-bold text-blue-600 dark:text-blue-400">₹{product.price}</span>
             <span className="text-xs text-gray-500 dark:text-gray-400">{product.condition}</span>
           </div>
-          <div className="mt-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+          <div className="mt-auto flex flex-col gap-3 pt-4 sm:flex-row sm:items-center sm:justify-between">
             <span className="text-xs text-gray-500 dark:text-gray-400">{product.sellerName}</span>
             {contactHref ? (
               <a
@@ -88,7 +88,7 @@ export default function ProductCard({ product }) {
                 target="_blank"
                 rel="noreferrer"
                 onClick={(e) => e.stopPropagation()}
-                className="inline-flex w-full items-center justify-center gap-2 rounded-lg bg-red-500 px-4 py-2 text-sm font-medium text-white transition hover:bg-red-600 sm:w-auto"
+                className="inline-flex h-10 w-full shrink-0 items-center justify-center gap-2 rounded-lg bg-red-500 px-4 py-2 text-sm font-medium text-white transition hover:bg-red-600 sm:w-[150px]"
               >
                 <svg
                   aria-hidden="true"

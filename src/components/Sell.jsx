@@ -407,7 +407,7 @@ export default function Sell() {
                       onClick={() => del(product.id)}
                       className="bg-red-500 text-white px-2 py-1 rounded text-sm hover:bg-red-600"
                     >
-                      Remove
+                      Sold
                     </button>
                   </div>
                 </div>

@@ -6,7 +6,6 @@ import {
   orderBy,
   query,
   startAfter,
-  where,
 } from 'firebase/firestore'
 import { db, auth } from '../firebase'
 import { useNavigate } from 'react-router-dom'
@@ -28,6 +27,7 @@ export default function Buy() {
   const [loadingMore, setLoadingMore] = useState(false)
   const [lastVisible, setLastVisible] = useState(null)
   const [hasMore, setHasMore] = useState(false)
+  const [visibleCount, setVisibleCount] = useState(PAGE_SIZE)
   const nav = useNavigate()
   const requestIdRef = useRef(0)
 
@@ -35,14 +35,6 @@ export default function Buy() {
 
   const buildProductsQuery = (cursor = null, pageLimit = PAGE_SIZE) => {
     const constraints = []
-
-    if (activeFilters.category !== 'All') {
-      constraints.push(where('category', '==', activeFilters.category))
-    }
-
-    if (activeFilters.cond !== 'All') {
-      constraints.push(where('condition', '==', activeFilters.cond))
-    }
 
     constraints.push(orderBy('createdAt', 'desc'))
 
@@ -57,11 +49,27 @@ export default function Buy() {
 
   const matchesClientFilters = (product) => {
     const normalizedSearch = activeFilters.search.trim().toLowerCase()
+    const normalizedCategory = String(product.category || '').trim().toLowerCase()
+    const normalizedCondition = String(product.condition || '').trim().toLowerCase()
 
     if (
       normalizedSearch &&
       !product.title?.toLowerCase().includes(normalizedSearch) &&
       !product.description?.toLowerCase().includes(normalizedSearch)
+    ) {
+      return false
+    }
+
+    if (
+      activeFilters.category !== 'All' &&
+      normalizedCategory !== activeFilters.category.trim().toLowerCase()
+    ) {
+      return false
+    }
+
+    if (
+      activeFilters.cond !== 'All' &&
+      normalizedCondition !== activeFilters.cond.trim().toLowerCase()
     ) {
       return false
     }
@@ -81,6 +89,7 @@ export default function Buy() {
     setProducts([])
     setLastVisible(null)
     setHasMore(false)
+    setVisibleCount(PAGE_SIZE)
   }
 
   const updateHasMoreState = async (cursor, currentRequestId) => {
@@ -195,6 +204,8 @@ export default function Buy() {
   }
 
   const filteredProducts = products.filter(matchesClientFilters)
+  const visibleProducts = filteredProducts.slice(0, visibleCount)
+  const canLoadMoreFilteredProducts = visibleCount < filteredProducts.length
 
   if (ld) return <div className="flex items-center justify-center min-h-screen">Loading...</div>
 
@@ -294,16 +305,16 @@ export default function Buy() {
         </div>
 
         <div className="mb-4 text-sm text-gray-600 dark:text-gray-300">
-          Showing {filteredProducts.length} loaded products
+          Showing {visibleProducts.length} of {filteredProducts.length} matching products
         </div>
 
-        {filteredProducts.length === 0 ? (
+        {visibleProducts.length === 0 ? (
           <div className="text-center py-16">
             <p className="text-gray-500 dark:text-gray-400">No products found matching your criteria</p>
           </div>
         ) : (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-            {filteredProducts.map(product => (
+            {visibleProducts.map(product => (
               <ProductCard 
                 key={product.id} 
                 product={product}
@@ -312,10 +323,17 @@ export default function Buy() {
           </div>
         )}
 
-        {hasMore && (
+        {(canLoadMoreFilteredProducts || hasMore) && (
           <div className="mt-8 flex justify-center">
             <button
-              onClick={() => fetchProducts()}
+              onClick={() => {
+                if (canLoadMoreFilteredProducts) {
+                  setVisibleCount((current) => current + PAGE_SIZE)
+                  return
+                }
+
+                fetchProducts()
+              }}
               disabled={loadingMore}
               className="rounded bg-blue-600 px-6 py-2 text-white transition hover:bg-blue-700 disabled:cursor-not-allowed disabled:bg-blue-400"
             >

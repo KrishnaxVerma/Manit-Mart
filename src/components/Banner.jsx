@@ -48,14 +48,6 @@ export default function Banner() {
               </p>
             </div>
             
-            <div className='flex flex-col sm:flex-row gap-4'>
-              <Link to="/signup" className='px-8 py-4 bg-pink-500 text-white rounded-lg hover:bg-pink-600 transition shadow-lg hover:shadow-xl font-semibold text-lg'>
-                Get Started
-              </Link>
-              <Link to="/login" className='px-8 py-4 border-2 border-blue-600 text-blue-600 dark:border-blue-400 dark:text-blue-400 rounded-lg hover:bg-blue-50 dark:hover:bg-blue-900/20 transition font-semibold text-lg'>
-                Login
-              </Link>
-            </div>
           </div>
         </div>
 

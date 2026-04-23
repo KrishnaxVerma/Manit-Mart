@@ -46,7 +46,7 @@ export default function Signup() {
       
       try {
         const actionCodeSettings = {
-          url: 'http://localhost:5173/verify-pending',
+          url: 'https://manit-mart.web.app/verify-pending',
           handleCodeInApp: true
         }
         await sendEmailVerification(u, actionCodeSettings)
