@@ -21,6 +21,31 @@ const DEFAULT_FILTERS = {
   priceRange: { min: '', max: '' },
 }
 
+const getProductTimestamp = (value) => {
+  if (!value) {
+    return 0
+  }
+
+  if (typeof value.toDate === 'function') {
+    return value.toDate().getTime()
+  }
+
+  if (value instanceof Date) {
+    return value.getTime()
+  }
+
+  const parsedTime = new Date(value).getTime()
+  return Number.isNaN(parsedTime) ? 0 : parsedTime
+}
+
+const areFiltersEqual = (leftFilters, rightFilters) =>
+  leftFilters.search === rightFilters.search &&
+  leftFilters.category === rightFilters.category &&
+  leftFilters.cond === rightFilters.cond &&
+  leftFilters.sortBy === rightFilters.sortBy &&
+  leftFilters.priceRange.min === rightFilters.priceRange.min &&
+  leftFilters.priceRange.max === rightFilters.priceRange.max
+
 export default function Buy() {
   const [products, setProducts] = useState([])
   const [tempFilters, setTempFilters] = useState(DEFAULT_FILTERS)
@@ -203,12 +228,12 @@ export default function Buy() {
       },
     }
 
-    if (!hasAnyFilterValue(nextFilters)) {
-      if (!hasAnyFilterValue(activeFilters)) {
-        setVisibleCount(FILTER_RESULTS_BATCH_SIZE)
-        return
-      }
+    if (areFiltersEqual(nextFilters, activeFilters)) {
+      setVisibleCount(FILTER_RESULTS_BATCH_SIZE)
+      return
+    }
 
+    if (!hasAnyFilterValue(nextFilters)) {
       requestIdRef.current += 1
       setLd(true)
       resetPaginationState()
@@ -223,6 +248,11 @@ export default function Buy() {
   }
 
   const clearAllFilters = () => {
+    if (areFiltersEqual(activeFilters, DEFAULT_FILTERS) && areFiltersEqual(tempFilters, DEFAULT_FILTERS)) {
+      setVisibleCount(FILTER_RESULTS_BATCH_SIZE)
+      return
+    }
+
     requestIdRef.current += 1
     setLd(true)
     resetPaginationState()
@@ -233,6 +263,13 @@ export default function Buy() {
   const filteredProducts = products
     .filter(matchesClientFilters)
     .sort((leftProduct, rightProduct) => {
+      if (activeFilters.sortBy === 'Newest') {
+        return (
+          getProductTimestamp(rightProduct.createdAt) -
+          getProductTimestamp(leftProduct.createdAt)
+        )
+      }
+
       if (activeFilters.sortBy === 'Price: Low to High') {
         return Number(leftProduct.price) - Number(rightProduct.price)
       }
@@ -255,7 +292,7 @@ export default function Buy() {
         <p className="text-gray-600 dark:text-gray-300 mb-8">Find items from MANIT students</p>
 
         <div className="bg-white dark:bg-slate-800 rounded-lg border border-gray-200 dark:border-slate-700 p-6 mb-8">
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-6 gap-4">
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-12 gap-4 items-end">
             <input
               type="text"
               placeholder="Search products..."
@@ -266,7 +303,7 @@ export default function Buy() {
                   search: e.target.value,
                 }))
               }
-              className="px-3 py-2 border border-gray-200 dark:border-slate-600 rounded focus:ring-1 focus:ring-blue-500 outline-none bg-white dark:bg-slate-700 text-gray-900 dark:text-white"
+              className="w-full px-3 py-2 border border-gray-200 dark:border-slate-600 rounded focus:ring-1 focus:ring-blue-500 outline-none bg-white dark:bg-slate-700 text-gray-900 dark:text-white lg:col-span-3"
             />
             <select
               value={tempFilters.category}
@@ -276,7 +313,7 @@ export default function Buy() {
                   category: e.target.value,
                 }))
               }
-              className="px-3 py-2 border border-gray-200 dark:border-slate-600 rounded focus:ring-1 focus:ring-blue-500 outline-none bg-white dark:bg-slate-700 text-gray-900 dark:text-white"
+              className="w-full px-3 py-2 border border-gray-200 dark:border-slate-600 rounded focus:ring-1 focus:ring-blue-500 outline-none bg-white dark:bg-slate-700 text-gray-900 dark:text-white lg:col-span-2"
             >
               {categories.map(cat => (
                 <option key={cat} value={cat}>{cat}</option>
@@ -290,7 +327,7 @@ export default function Buy() {
                   cond: e.target.value,
                 }))
               }
-              className="px-3 py-2 border border-gray-200 dark:border-slate-600 rounded focus:ring-1 focus:ring-blue-500 outline-none bg-white dark:bg-slate-700 text-gray-900 dark:text-white"
+              className="w-full px-3 py-2 border border-gray-200 dark:border-slate-600 rounded focus:ring-1 focus:ring-blue-500 outline-none bg-white dark:bg-slate-700 text-gray-900 dark:text-white lg:col-span-2"
             >
               <option value="All">All Conditions</option>
               <option value="Like New">Like New</option>
@@ -306,13 +343,13 @@ export default function Buy() {
                   sortBy: e.target.value,
                 }))
               }
-              className="px-3 py-2 border border-gray-200 dark:border-slate-600 rounded focus:ring-1 focus:ring-blue-500 outline-none bg-white dark:bg-slate-700 text-gray-900 dark:text-white"
+              className="w-full px-3 py-2 border border-gray-200 dark:border-slate-600 rounded focus:ring-1 focus:ring-blue-500 outline-none bg-white dark:bg-slate-700 text-gray-900 dark:text-white lg:col-span-2"
             >
               <option value="Newest">Sort: Newest</option>
               <option value="Price: Low to High">Price: Low to High</option>
               <option value="Price: High to Low">Price: High to Low</option>
             </select>
-            <div className="flex gap-2">
+            <div className="flex w-full gap-2 lg:col-span-2">
               <input
                 type="number"
                 placeholder="Min"
@@ -323,7 +360,7 @@ export default function Buy() {
                     priceRange: { ...current.priceRange, min: e.target.value },
                   }))
                 }
-                className="w-24 px-3 py-2 border border-gray-200 dark:border-slate-600 rounded focus:ring-1 focus:ring-blue-500 outline-none bg-white dark:bg-slate-700 text-gray-900 dark:text-white"
+                className="min-w-0 flex-1 px-3 py-2 border border-gray-200 dark:border-slate-600 rounded focus:ring-1 focus:ring-blue-500 outline-none bg-white dark:bg-slate-700 text-gray-900 dark:text-white"
               />
               <input
                 type="number"
@@ -335,21 +372,21 @@ export default function Buy() {
                     priceRange: { ...current.priceRange, max: e.target.value },
                   }))
                 }
-                className="w-24 px-3 py-2 border border-gray-200 dark:border-slate-600 rounded focus:ring-1 focus:ring-blue-500 outline-none bg-white dark:bg-slate-700 text-gray-900 dark:text-white"
+                className="min-w-0 flex-1 px-3 py-2 border border-gray-200 dark:border-slate-600 rounded focus:ring-1 focus:ring-blue-500 outline-none bg-white dark:bg-slate-700 text-gray-900 dark:text-white"
               />
             </div>
-            <div className="flex gap-2">
+            <div className="flex flex-col gap-2 md:flex-row lg:col-span-3">
               <button
                 onClick={applyFilters}
                 disabled={ld}
-                className="rounded bg-blue-600 px-4 py-2 text-white transition hover:bg-blue-700 disabled:cursor-not-allowed disabled:bg-blue-400"
+                className="w-full rounded bg-blue-600 px-4 py-2 text-white transition hover:bg-blue-700 disabled:cursor-not-allowed disabled:bg-blue-400"
               >
                 {ld ? 'Searching...' : 'Filter/Search'}
               </button>
               <button
                 onClick={clearAllFilters}
                 disabled={ld}
-                className="rounded border border-gray-300 px-4 py-2 text-gray-700 transition hover:bg-gray-100 disabled:cursor-not-allowed disabled:opacity-60 dark:border-slate-600 dark:text-gray-200 dark:hover:bg-slate-700"
+                className="w-full rounded border border-gray-300 px-4 py-2 text-gray-700 transition hover:bg-gray-100 disabled:cursor-not-allowed disabled:opacity-60 dark:border-slate-600 dark:text-gray-200 dark:hover:bg-slate-700"
               >
                 Clear All
               </button>
