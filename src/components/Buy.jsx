@@ -17,6 +17,7 @@ const DEFAULT_FILTERS = {
   search: '',
   category: 'All',
   cond: 'All',
+  sortBy: 'Newest',
   priceRange: { min: '', max: '' },
 }
 
@@ -38,6 +39,7 @@ export default function Buy() {
     filters.search.trim() !== '' ||
     filters.category !== 'All' ||
     filters.cond !== 'All' ||
+    filters.sortBy !== 'Newest' ||
     filters.priceRange.min !== '' ||
     filters.priceRange.max !== ''
 
@@ -184,6 +186,7 @@ export default function Buy() {
     activeFilters.category,
     activeFilters.cond,
     activeFilters.search,
+    activeFilters.sortBy,
     activeFilters.priceRange.min,
     activeFilters.priceRange.max,
   ])
@@ -193,6 +196,7 @@ export default function Buy() {
       search: tempFilters.search,
       category: tempFilters.category,
       cond: tempFilters.cond,
+      sortBy: tempFilters.sortBy,
       priceRange: {
         min: tempFilters.priceRange.min,
         max: tempFilters.priceRange.max,
@@ -226,7 +230,19 @@ export default function Buy() {
     setActiveFilters(DEFAULT_FILTERS)
   }
 
-  const filteredProducts = products.filter(matchesClientFilters)
+  const filteredProducts = products
+    .filter(matchesClientFilters)
+    .sort((leftProduct, rightProduct) => {
+      if (activeFilters.sortBy === 'Price: Low to High') {
+        return Number(leftProduct.price) - Number(rightProduct.price)
+      }
+
+      if (activeFilters.sortBy === 'Price: High to Low') {
+        return Number(rightProduct.price) - Number(leftProduct.price)
+      }
+
+      return 0
+    })
   const visibleProducts = filteredProducts.slice(0, visibleCount)
   const canLoadMoreFilteredProducts = visibleCount < filteredProducts.length
 
@@ -239,7 +255,7 @@ export default function Buy() {
         <p className="text-gray-600 dark:text-gray-300 mb-8">Find items from MANIT students</p>
 
         <div className="bg-white dark:bg-slate-800 rounded-lg border border-gray-200 dark:border-slate-700 p-6 mb-8">
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4">
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-6 gap-4">
             <input
               type="text"
               placeholder="Search products..."
@@ -281,6 +297,20 @@ export default function Buy() {
               <option value="Good">Good</option>
               <option value="Fair">Fair</option>
               <option value="Poor">Poor</option>
+            </select>
+            <select
+              value={tempFilters.sortBy}
+              onChange={(e) =>
+                setTempFilters((current) => ({
+                  ...current,
+                  sortBy: e.target.value,
+                }))
+              }
+              className="px-3 py-2 border border-gray-200 dark:border-slate-600 rounded focus:ring-1 focus:ring-blue-500 outline-none bg-white dark:bg-slate-700 text-gray-900 dark:text-white"
+            >
+              <option value="Newest">Sort: Newest</option>
+              <option value="Price: Low to High">Price: Low to High</option>
+              <option value="Price: High to Low">Price: High to Low</option>
             </select>
             <div className="flex gap-2">
               <input

@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react'
-import { collection, addDoc, query, where, onSnapshot, deleteDoc, doc, updateDoc } from 'firebase/firestore'
+import { collection, addDoc, query, where, onSnapshot, deleteDoc, doc, getDoc, updateDoc } from 'firebase/firestore'
 import { db, auth } from '../firebase'
 import { useNavigate } from 'react-router-dom'
 import toast from 'react-hot-toast'
@@ -170,6 +170,13 @@ export default function Sell() {
     setLd(true)
     setUploadingImages(frm.imageFiles.length > 0)
     try {
+      const userSnapshot = await getDoc(doc(db, 'users', auth.currentUser.uid))
+      const profileName = userSnapshot.exists() ? userSnapshot.data()?.name?.trim() : ''
+      const sellerName =
+        profileName || auth.currentUser.displayName?.trim() || auth.currentUser.email.split('@')[0]
+      const storedEmail = userSnapshot.exists() ? userSnapshot.data()?.email?.trim() : ''
+      const sellerEmail = storedEmail || auth.currentUser.email?.trim() || ''
+
       // Upload images only during form submission
       let finalImageUrls = frm.imageUrls
       
@@ -185,7 +192,8 @@ export default function Sell() {
         imageUrls: finalImageUrls,
         price: Number(frm.price),
         sellerId: auth.currentUser.uid,
-        sellerName: auth.currentUser.email.split('@')[0],
+        sellerName,
+        sellerEmail,
         updatedAt: new Date()
       }
 

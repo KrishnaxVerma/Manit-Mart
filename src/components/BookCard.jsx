@@ -1,14 +1,18 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
+import { doc, getDoc } from 'firebase/firestore'
 import { getOptimizedCloudinaryUrl, getProductImages } from '../utils/productImages'
+import { db } from '../firebase'
 
 export default function ProductCard({ product }) {
   const [currentImg, setCurrentImg] = useState(0)
   const [showAllImages, setShowAllImages] = useState(false)
+  const [ownerName, setOwnerName] = useState(product.sellerName || 'Unknown seller')
+  const [ownerEmail, setOwnerEmail] = useState(product.sellerEmail?.trim() || '')
   const images = getProductImages(product)
   const galleryImages = images.map((image) =>
     getOptimizedCloudinaryUrl(image, 'w_400,c_scale')
   )
-  const sellerEmail = product.sellerEmail?.trim() || ''
+  const sellerEmail = ownerEmail
   const subject = encodeURIComponent(`Interested in buying ${product.title} - MANIT Mart`)
   const body = encodeURIComponent(
     `Hi, I saw your listing for '${product.title}' on MANIT Mart and I am interested in buying it. Is it still available?`
@@ -16,6 +20,46 @@ export default function ProductCard({ product }) {
   const contactHref = sellerEmail
     ? `https://mail.google.com/mail/?view=cm&fs=1&to=${encodeURIComponent(sellerEmail)}&su=${subject}&body=${body}`
     : null
+
+  useEffect(() => {
+    let isMounted = true
+
+    setOwnerName(product.sellerName || 'Unknown seller')
+    setOwnerEmail(product.sellerEmail?.trim() || '')
+
+    const loadOwnerName = async () => {
+      if (!product.sellerId) {
+        return
+      }
+
+      try {
+        const userSnapshot = await getDoc(doc(db, 'users', product.sellerId))
+
+        if (!isMounted || !userSnapshot.exists()) {
+          return
+        }
+
+        const profileName = userSnapshot.data()?.name?.trim()
+        const profileEmail = userSnapshot.data()?.email?.trim()
+
+        if (profileName) {
+          setOwnerName(profileName)
+        }
+
+        if (profileEmail) {
+          setOwnerEmail(profileEmail)
+        }
+      } catch (error) {
+        // Fall back to the stored sellerName when profile lookup fails.
+      }
+    }
+
+    loadOwnerName()
+
+    return () => {
+      isMounted = false
+    }
+  }, [product.sellerEmail, product.sellerId, product.sellerName])
 
   const nextImg = () => {
     setCurrentImg((prev) => (prev + 1) % images.length)
@@ -81,7 +125,7 @@ export default function ProductCard({ product }) {
             <span className="text-xs text-gray-500 dark:text-gray-400">{product.condition}</span>
           </div>
           <div className="mt-auto flex flex-col gap-3 pt-4 sm:flex-row sm:items-center sm:justify-between">
-            <span className="text-xs text-gray-500 dark:text-gray-400">{product.sellerName}</span>
+            <span className="text-xs text-gray-500 dark:text-gray-400">{ownerName}</span>
             {contactHref ? (
               <a
                 href={contactHref}
@@ -156,7 +200,7 @@ export default function ProductCard({ product }) {
                     </div>
                     <div>
                       <span className="text-sm text-gray-500 dark:text-gray-400">Seller:</span>
-                      <p className="font-medium text-gray-900 dark:text-white">{product.sellerName}</p>
+                      <p className="font-medium text-gray-900 dark:text-white">{ownerName}</p>
                     </div>
                     <div>
                       <span className="text-sm text-gray-500 dark:text-gray-400">Description:</span>
