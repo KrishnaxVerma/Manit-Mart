@@ -46,6 +46,13 @@ const areFiltersEqual = (leftFilters, rightFilters) =>
   leftFilters.priceRange.min === rightFilters.priceRange.min &&
   leftFilters.priceRange.max === rightFilters.priceRange.max
 
+const hasResultLimitingFilters = (filters) =>
+  filters.search.trim() !== '' ||
+  filters.category !== 'All' ||
+  filters.cond !== 'All' ||
+  filters.priceRange.min !== '' ||
+  filters.priceRange.max !== ''
+
 export default function Buy() {
   const [products, setProducts] = useState([])
   const [tempFilters, setTempFilters] = useState(DEFAULT_FILTERS)
@@ -82,8 +89,8 @@ export default function Buy() {
     return query(collection(db, 'products'), ...constraints)
   }
 
-  const matchesClientFilters = (product) => {
-    const normalizedSearch = activeFilters.search.trim().toLowerCase()
+  const matchesFilters = (product, filters) => {
+    const normalizedSearch = filters.search.trim().toLowerCase()
     const normalizedCategory = String(product.category || '').trim().toLowerCase()
     const normalizedCondition = String(product.condition || '').trim().toLowerCase()
 
@@ -96,24 +103,24 @@ export default function Buy() {
     }
 
     if (
-      activeFilters.category !== 'All' &&
-      normalizedCategory !== activeFilters.category.trim().toLowerCase()
+      filters.category !== 'All' &&
+      normalizedCategory !== filters.category.trim().toLowerCase()
     ) {
       return false
     }
 
     if (
-      activeFilters.cond !== 'All' &&
-      normalizedCondition !== activeFilters.cond.trim().toLowerCase()
+      filters.cond !== 'All' &&
+      normalizedCondition !== filters.cond.trim().toLowerCase()
     ) {
       return false
     }
 
-    if (activeFilters.priceRange.min && product.price < Number(activeFilters.priceRange.min)) {
+    if (filters.priceRange.min && product.price < Number(filters.priceRange.min)) {
       return false
     }
 
-    if (activeFilters.priceRange.max && product.price > Number(activeFilters.priceRange.max)) {
+    if (filters.priceRange.max && product.price > Number(filters.priceRange.max)) {
       return false
     }
 
@@ -142,9 +149,11 @@ export default function Buy() {
     }
   }
 
-  const fetchProducts = async ({ reset = false } = {}) => {
+  const fetchProducts = async ({ reset = false, filters = activeFilters, targetMatchCount = 0 } = {}) => {
     const currentRequestId = requestIdRef.current
-    const cursor = reset ? null : lastVisible
+    let cursor = reset ? null : lastVisible
+    let aggregatedProducts = reset ? [] : products
+    let reachedEnd = false
 
     if (reset) {
       setLd(true)
@@ -158,27 +167,40 @@ export default function Buy() {
     }
 
     try {
-      const snapshot = await getDocs(buildProductsQuery(cursor))
+      do {
+        const snapshot = await getDocs(buildProductsQuery(cursor))
 
-      if (requestIdRef.current !== currentRequestId) {
-        return
-      }
+        if (requestIdRef.current !== currentRequestId) {
+          return
+        }
 
-      const nextProducts = snapshot.docs.map((doc) => ({
-        id: doc.id,
-        ...doc.data(),
-      }))
-      const nextCursor = snapshot.docs.at(-1) ?? cursor ?? null
+        const nextProducts = snapshot.docs.map((doc) => ({
+          id: doc.id,
+          ...doc.data(),
+        }))
 
-      setProducts((currentProducts) =>
-        reset ? nextProducts : [...currentProducts, ...nextProducts]
-      )
-      setLastVisible(nextCursor)
+        aggregatedProducts = reset
+          ? [...aggregatedProducts, ...nextProducts]
+          : [...aggregatedProducts, ...nextProducts]
+        cursor = snapshot.docs.at(-1) ?? cursor ?? null
+        reachedEnd = snapshot.empty || snapshot.docs.length < PAGE_SIZE
 
-      if (snapshot.empty || snapshot.docs.length < PAGE_SIZE) {
+        const matchingCount = aggregatedProducts.filter((product) =>
+          matchesFilters(product, filters)
+        ).length
+
+        if (!hasResultLimitingFilters(filters) || matchingCount >= targetMatchCount || reachedEnd) {
+          break
+        }
+      } while (true)
+
+      setProducts(aggregatedProducts)
+      setLastVisible(cursor)
+
+      if (reachedEnd) {
         setHasMore(false)
       } else {
-        await updateHasMoreState(nextCursor, currentRequestId)
+        await updateHasMoreState(cursor, currentRequestId)
       }
     } catch (error) {
       if (requestIdRef.current === currentRequestId) {
@@ -203,7 +225,11 @@ export default function Buy() {
     }
 
     requestIdRef.current += 1
-    fetchProducts({ reset: true })
+    fetchProducts({
+      reset: true,
+      filters: activeFilters,
+      targetMatchCount: hasResultLimitingFilters(activeFilters) ? FILTER_RESULTS_BATCH_SIZE : 0,
+    })
     // `fetchProducts` is intentionally omitted to avoid re-running on every render.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [
@@ -261,7 +287,7 @@ export default function Buy() {
   }
 
   const filteredProducts = products
-    .filter(matchesClientFilters)
+    .filter((product) => matchesFilters(product, activeFilters))
     .sort((leftProduct, rightProduct) => {
       if (activeFilters.sortBy === 'Newest') {
         return (
@@ -417,12 +443,18 @@ export default function Buy() {
           <div className="mt-8 flex justify-center">
             <button
               onClick={() => {
+                const nextVisibleCount = visibleCount + FILTER_RESULTS_BATCH_SIZE
+
                 if (canLoadMoreFilteredProducts) {
-                  setVisibleCount((current) => current + FILTER_RESULTS_BATCH_SIZE)
+                  setVisibleCount(nextVisibleCount)
                   return
                 }
 
-                fetchProducts()
+                setVisibleCount(nextVisibleCount)
+                fetchProducts({
+                  filters: activeFilters,
+                  targetMatchCount: nextVisibleCount,
+                })
               }}
               disabled={loadingMore}
               className="rounded bg-blue-600 px-6 py-2 text-white transition hover:bg-blue-700 disabled:cursor-not-allowed disabled:bg-blue-400"
