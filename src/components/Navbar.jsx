@@ -1,56 +1,57 @@
 import React, { useState, useEffect } from 'react'
 import { Link } from 'react-router-dom'
 import { onAuthStateChanged } from 'firebase/auth'
-import { auth } from '../firebase'
+import { collection, query, where, onSnapshot } from 'firebase/firestore'
+import { auth, db } from '../firebase'
+import { useWishlist } from '../hooks/useWishlist'
 import Login from './Login'
 import Logout from './Logout'
-
-const navItems = (
-  <>
-    <li key="home" className="group">
-      <Link to='/' className="px-4 py-2 text-gray-700 dark:text-gray-300 hover:text-pink-500 transition-colors relative">
-        Home
-        <span className="absolute bottom-0 left-0 w-0 h-0.5 bg-pink-500 group-hover:w-full transition-all"></span>
-      </Link>
-    </li>
-    <li key="buy" className="group">
-      <Link to='/buy' className="px-4 py-2 text-gray-700 dark:text-gray-300 hover:text-pink-500 transition-colors relative">
-        Buy
-        <span className="absolute bottom-0 left-0 w-0 h-0.5 bg-pink-500 group-hover:w-full transition-all"></span>
-      </Link>
-    </li>
-    <li key="sell" className="group">
-      <Link to='/sell' className="px-4 py-2 text-gray-700 dark:text-gray-300 hover:text-pink-500 transition-colors relative">
-        Sell
-        <span className="absolute bottom-0 left-0 w-0 h-0.5 bg-pink-500 group-hover:w-full transition-all"></span>
-      </Link>
-    </li>
-    <li key="profile" className="group">
-      <Link to='/profile' className="px-4 py-2 text-gray-700 dark:text-gray-300 hover:text-pink-500 transition-colors relative">
-        Profile
-        <span className="absolute bottom-0 left-0 w-0 h-0.5 bg-pink-500 group-hover:w-full transition-all"></span>
-      </Link>
-    </li>
-    <li key="contact" className="group">
-      <Link to='/contact' className="px-4 py-2 text-gray-700 dark:text-gray-300 hover:text-pink-500 transition-colors relative">
-        Contact Us
-        <span className="absolute bottom-0 left-0 w-0 h-0.5 bg-pink-500 group-hover:w-full transition-all"></span>
-      </Link>
-    </li>
-  </>
-)
 
 function Navbar() {
   const [usr, setUsr] = useState(null)
   const [theme, setTheme] = useState(localStorage.getItem("theme") || "light")
   const [sticky, setSticky] = useState(false)
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
+  const [unreadCount, setUnreadCount] = useState(0)
+  const { wishlistItems } = useWishlist()
+  const wishlistCount = wishlistItems?.length || 0
   const element = document.documentElement
 
   useEffect(() => {
     const unsub = onAuthStateChanged(auth, (u) => setUsr(u))
     return unsub
   }, [])
+
+  // Listen to total unread messages across all active conversations
+  useEffect(() => {
+    if (!usr) {
+      setUnreadCount(0)
+      return
+    }
+
+    const q = query(
+      collection(db, 'conversations'),
+      where('participants', 'array-contains', usr.uid)
+    )
+
+    const unsub = onSnapshot(
+      q,
+      (snapshot) => {
+        let total = 0
+        snapshot.docs.forEach((docSnap) => {
+          const data = docSnap.data()
+          const count = data.unreadCount?.[usr.uid] || 0
+          total += count
+        })
+        setUnreadCount(total)
+      },
+      () => {
+        // Silently ignore permission/index errors in navbar
+      }
+    )
+
+    return () => unsub()
+  }, [usr])
 
   useEffect(() => {
     if (theme === "dark") {
@@ -70,6 +71,78 @@ function Navbar() {
     return () => window.removeEventListener('scroll', handleScroll)
   }, [])
 
+  const navLinks = (
+    <>
+      <li key="home" className="group">
+        <Link
+          to="/"
+          onClick={() => setMobileMenuOpen(false)}
+          className="px-4 py-2 text-gray-700 dark:text-gray-300 hover:text-pink-500 transition-colors relative block"
+        >
+          Home
+          <span className="absolute bottom-0 left-0 w-0 h-0.5 bg-pink-500 group-hover:w-full transition-all"></span>
+        </Link>
+      </li>
+      <li key="buy" className="group">
+        <Link
+          to="/buy"
+          onClick={() => setMobileMenuOpen(false)}
+          className="px-4 py-2 text-gray-700 dark:text-gray-300 hover:text-pink-500 transition-colors relative block"
+        >
+          Buy
+          <span className="absolute bottom-0 left-0 w-0 h-0.5 bg-pink-500 group-hover:w-full transition-all"></span>
+        </Link>
+      </li>
+      <li key="sell" className="group">
+        <Link
+          to="/sell"
+          onClick={() => setMobileMenuOpen(false)}
+          className="px-4 py-2 text-gray-700 dark:text-gray-300 hover:text-pink-500 transition-colors relative block"
+        >
+          Sell
+          <span className="absolute bottom-0 left-0 w-0 h-0.5 bg-pink-500 group-hover:w-full transition-all"></span>
+        </Link>
+      </li>
+      {usr && (
+        <li key="messages" className="group">
+          <Link
+            to="/messages"
+            onClick={() => setMobileMenuOpen(false)}
+            className="px-4 py-2 text-gray-700 dark:text-gray-300 hover:text-pink-500 transition-colors relative flex items-center gap-1.5"
+          >
+            Messages
+            {unreadCount > 0 && (
+              <span className="badge badge-primary badge-xs font-bold text-white px-1.5 py-0.5">
+                {unreadCount > 99 ? '99+' : unreadCount}
+              </span>
+            )}
+            <span className="absolute bottom-0 left-0 w-0 h-0.5 bg-pink-500 group-hover:w-full transition-all"></span>
+          </Link>
+        </li>
+      )}
+      <li key="account" className="group">
+        <Link
+          to="/account"
+          onClick={() => setMobileMenuOpen(false)}
+          className="px-4 py-2 text-gray-700 dark:text-gray-300 hover:text-pink-500 transition-colors relative block"
+        >
+          Account
+          <span className="absolute bottom-0 left-0 w-0 h-0.5 bg-pink-500 group-hover:w-full transition-all"></span>
+        </Link>
+      </li>
+      <li key="contact" className="group">
+        <Link
+          to="/contact"
+          onClick={() => setMobileMenuOpen(false)}
+          className="px-4 py-2 text-gray-700 dark:text-gray-300 hover:text-pink-500 transition-colors relative block"
+        >
+          Contact Us
+          <span className="absolute bottom-0 left-0 w-0 h-0.5 bg-pink-500 group-hover:w-full transition-all"></span>
+        </Link>
+      </li>
+    </>
+  )
+
   return (
     <>
       <div className={`z-50 max-w-screen-2xl container mx-auto md:px-20 px-4 dark:bg-slate-900 dark:text-white fixed top-0 left-0 right-0 ${sticky ? "shadow-lg bg-white/95 dark:bg-slate-900/95 backdrop-blur-sm duration-300 transition-all ease-in-out" : "bg-white dark:bg-slate-900"}`}>
@@ -79,6 +152,7 @@ function Navbar() {
               <button
                 onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
                 className="p-2 rounded-md text-gray-700 dark:text-gray-300 hover:text-pink-500 hover:bg-gray-100 dark:hover:bg-slate-800"
+                aria-label="Toggle menu"
               >
                 <svg
                   xmlns="http://www.w3.org/2000/svg"
@@ -96,22 +170,51 @@ function Navbar() {
               {mobileMenuOpen && (
                 <div className="absolute top-16 left-0 w-full bg-white dark:bg-slate-800 border-b border-gray-200 dark:border-slate-700 shadow-lg">
                   <ul className="py-2">
-                    {navItems}
+                    {navLinks}
                   </ul>
                 </div>
               )}
             </div>
-            <a className="text-2xl font-bold cursor-pointer text-gray-900 dark:text-white">MANIT Mart</a>
+            <Link to="/" className="text-2xl font-bold cursor-pointer text-gray-900 dark:text-white">MANIT Mart</Link>
           </div>
           
           <div className="hidden lg:flex items-center space-x-8">
             <ul className="flex space-x-8">
-              {navItems}
+              {navLinks}
             </ul>
           </div>
 
-          <div className="flex items-center space-x-4">
-            <label className="swap swap-rotate">
+          <div className="flex items-center space-x-3">
+            {usr && (
+              <Link
+                to="/account?tab=saved"
+                className="btn btn-ghost btn-circle btn-sm relative text-gray-700 dark:text-gray-300 hover:text-red-500 hover:bg-gray-100 dark:hover:bg-slate-800 transition"
+                title="View Saved Items"
+                aria-label="Wishlist"
+              >
+                <svg
+                  xmlns="http://www.w3.org/2000/svg"
+                  fill="none"
+                  viewBox="0 0 24 24"
+                  strokeWidth="1.8"
+                  stroke="currentColor"
+                  className="w-5 h-5"
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    d="M21 8.25c0-2.485-2.099-4.5-4.688-4.5-1.935 0-3.597 1.126-4.312 2.733-.715-1.607-2.377-2.733-4.313-2.733C5.1 3.75 3 5.765 3 8.25c0 7.22 9 12 9 12s9-4.78 9-12z"
+                  />
+                </svg>
+                {wishlistCount > 0 && (
+                  <span className="badge badge-primary badge-xs font-bold text-white absolute -top-1 -right-1 px-1">
+                    {wishlistCount > 99 ? '99+' : wishlistCount}
+                  </span>
+                )}
+              </Link>
+            )}
+
+            <label className="swap swap-rotate" aria-label="Toggle Theme">
               <input type="checkbox" className="theme-controller" checked={theme === "dark"} onChange={() => setTheme(theme === "light" ? "dark" : "light")} />
               <svg
                 className="swap-off h-6 w-6 fill-current"

@@ -1,20 +1,190 @@
 rules_version = '2';
 
+// ===============================================================
+// Assumed Data Model
+// ===============================================================
+//
+// Collection: conversations/{conversationId}
+// Document ID: Typically `{listingId}_{buyerId}`
+// Fields:
+//   - id: string (required, 1-100 chars, immutable)
+//   - listingId: string (required, 1-100 chars, immutable)
+//   - listingTitle: string (required, 0-200 chars)
+//   - listingPrice: number (required, >= 0)
+//   - listingImage: string (required, 0-1000 chars)
+//   - sellerId: string (required, 1-100 chars, immutable)
+//   - buyerId: string (required, 1-100 chars, immutable)
+//   - participants: list of strings (required, exactly 2 elements [sellerId, buyerId], immutable)
+//   - lastMessage: string (required, 0-2000 chars)
+//   - lastUpdated: timestamp (required)
+//   - unreadCount: map of string (userId) to number (required)
+//
+// Subcollection: conversations/{conversationId}/messages/{messageId}
+// Document ID: Auto-generated Firestore ID
+// Fields:
+//   - senderId: string (required, equals request.auth.uid)
+//   - text: string (required, 1-2000 chars)
+//   - createdAt: timestamp (required)
+//   - isOffer: bool (required)
+//   - offerAmount: number or null (optional/conditional: positive number if isOffer == true, null/omitted if false)
+//
+// Existing Collections (users, products, etc.):
+//   - Preserved with authenticated access for seamless marketplace operation
+//
+// ===============================================================
+
 service cloud.firestore {
   match /databases/{database}/documents {
 
-    // This rule allows anyone with your Firestore database reference to view, edit,
-    // and delete all data in your Firestore database. It is useful for getting
-    // started, but it is configured to expire after 30 days because it
-    // leaves your app open to attackers. At that time, all client
-    // requests to your Firestore database will be denied.
-    //
-    // Make sure to write security rules for your app before that time, or else
-    // all client requests to your Firestore database will be denied until you Update
-    // your rules
-    match /{document=**} {
-      // allow read, write: if request.time < timestamp.date(2026, 2, 18);
-      allow read, write: if request.auth != null;
+    // ===============================================================
+    // Helper Functions
+    // ===============================================================
+
+    // Check if the request is from an authenticated user
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+
+    // Verify document contains only explicitly allowed fields
+    function hasOnlyAllowedFields(data, allowedFields) {
+      return data.keys().hasOnly(allowedFields);
+    }
+
+    // Verify document contains all mandatory fields
+    function hasRequiredFields(data, requiredFields) {
+      return data.keys().hasAll(requiredFields);
+    }
+
+    // Check whether the authenticated user is a participant of the parent conversation
+    function isConversationParticipant(conversationId) {
+      return isAuthenticated() &&
+        exists(/databases/$(database)/documents/conversations/$(conversationId)) &&
+        request.auth.uid in get(/databases/$(database)/documents/conversations/$(conversationId)).data.participants;
+    }
+
+    // Domain validator for conversation documents (used in BOTH create and update)
+    function isValidConversation(data) {
+      return hasOnlyAllowedFields(data, [
+               'id', 'listingId', 'listingTitle', 'listingPrice', 'listingImage',
+               'sellerId', 'buyerId', 'participants', 'lastMessage', 'lastUpdated', 'unreadCount'
+             ]) &&
+             hasRequiredFields(data, [
+               'id', 'listingId', 'listingTitle', 'listingPrice', 'listingImage',
+               'sellerId', 'buyerId', 'participants', 'lastMessage', 'lastUpdated', 'unreadCount'
+             ]) &&
+             data.id is string && data.id.size() > 0 && data.id.size() <= 100 &&
+             data.listingId is string && data.listingId.size() > 0 && data.listingId.size() <= 100 &&
+             data.listingTitle is string && data.listingTitle.size() <= 200 &&
+             data.listingPrice is number && data.listingPrice >= 0 &&
+             data.listingImage is string && data.listingImage.size() <= 1000 &&
+             data.sellerId is string && data.sellerId.size() > 0 && data.sellerId.size() <= 100 &&
+             data.buyerId is string && data.buyerId.size() > 0 && data.buyerId.size() <= 100 &&
+             data.participants is list && data.participants.size() == 2 &&
+             data.participants.hasAll([data.sellerId, data.buyerId]) &&
+             data.lastMessage is string && data.lastMessage.size() <= 2000 &&
+             data.lastUpdated is timestamp &&
+             data.unreadCount is map;
+    }
+
+    // Ensure critical conversation routing and identity fields cannot be modified on update
+    function areConversationImmutableFieldsUnchanged() {
+      return request.resource.data.id == resource.data.id &&
+             request.resource.data.listingId == resource.data.listingId &&
+             request.resource.data.sellerId == resource.data.sellerId &&
+             request.resource.data.buyerId == resource.data.buyerId &&
+             request.resource.data.participants == resource.data.participants;
+    }
+
+    // Domain validator for message documents (used in create)
+    function isValidMessage(data) {
+      return hasOnlyAllowedFields(data, ['senderId', 'text', 'createdAt', 'isOffer', 'offerAmount']) &&
+             hasRequiredFields(data, ['senderId', 'text', 'createdAt', 'isOffer']) &&
+             data.senderId is string && data.senderId.size() > 0 && data.senderId.size() <= 100 &&
+             data.text is string && data.text.size() > 0 && data.text.size() <= 2000 &&
+             data.createdAt is timestamp &&
+             data.isOffer is bool &&
+             (
+               (data.isOffer == true && data.offerAmount is number && data.offerAmount > 0) ||
+               (data.isOffer == false && (!('offerAmount' in data) || data.offerAmount == null))
+             );
+    }
+
+    // ===============================================================
+    // Conversations Collection & Messages Subcollection
+    // ===============================================================
+
+    match /conversations/{conversationId} {
+      // Allow read/list only if the authenticated user is an active participant
+      allow read: if isAuthenticated() && request.auth.uid in resource.data.participants;
+
+      // Allow conversation creation:
+      // - Must be authenticated
+      // - Document must satisfy schema and size constraints
+      // - Creator must be the buyer
+      // - Authenticated user must be in participants list
+      // - Participants must contain exactly 2 distinct members (buyer and seller)
+      allow create: if isAuthenticated() &&
+                    isValidConversation(request.resource.data) &&
+                    request.resource.data.buyerId == request.auth.uid &&
+                    request.auth.uid in request.resource.data.participants &&
+                    request.resource.data.participants.size() == 2 &&
+                    request.resource.data.sellerId != request.resource.data.buyerId;
+
+      // Allow updates (e.g. lastMessage, lastUpdated, unreadCount):
+      // - Must be an existing participant
+      // - Resulting document must remain valid
+      // - Crucial routing fields (id, listingId, sellerId, buyerId, participants) cannot be mutated
+      allow update: if isAuthenticated() &&
+                    request.auth.uid in resource.data.participants &&
+                    isValidConversation(request.resource.data) &&
+                    areConversationImmutableFieldsUnchanged();
+
+      // Deletes are strictly disallowed to maintain an immutable audit trail for campus trade safety
+      allow delete: if false;
+
+      // Messages Subcollection
+      match /messages/{messageId} {
+        // Only participants in the parent conversation can read messages
+        allow read: if isConversationParticipant(conversationId);
+
+        // Allow message creation:
+        // - Authenticated user must be a participant in the parent conversation
+        // - Sender ID must match authenticated UID
+        // - Message data and offer amounts must be validated
+        allow create: if isConversationParticipant(conversationId) &&
+                      request.resource.data.senderId == request.auth.uid &&
+                      isValidMessage(request.resource.data);
+
+        // Messages are immutable once posted; updates and deletes are prohibited
+        allow update, delete: if false;
+      }
+    }
+
+    // ===============================================================
+    // Other Application Collections (users, products, etc.)
+    // ===============================================================
+
+    // Users profile collection & Wishlist subcollection
+    match /users/{userId} {
+      allow read, write: if isAuthenticated();
+
+      match /wishlist/{listingId} {
+        allow read, write: if request.auth != null && request.auth.uid == userId;
+      }
+    }
+
+    // Products listings collection
+    match /products/{productId} {
+      allow read, write: if isAuthenticated();
+    }
+
+    // Catch-all fallback for any other collections while strictly excluding conversations and wishlists
+    match /{collection}/{docId} {
+      allow read, write: if isAuthenticated() && collection != 'conversations';
+    }
+
+    match /{collection}/{docId}/{subcollection}/{subDocId} {
+      allow read, write: if isAuthenticated() && collection != 'conversations' && subcollection != 'wishlist';
     }
   }
 }

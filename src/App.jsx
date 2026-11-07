@@ -12,6 +12,9 @@ import Login from './components/Login'
 import VerificationPending from './components/VerificationPending'
 import Contact from './components/Contact'
 import Layout from './components/Layout'
+import Messages from './components/Messages'
+import Account from './components/Account'
+import { WishlistProvider } from './context/WishlistContext'
 
 export default function App() {
   const [usr, setUsr] = useState(null)
@@ -46,23 +49,29 @@ export default function App() {
     { path: "/verify-pending", element: usr ? (usr.emailVerified ? <Navigate to="/dashboard" /> : <VerificationPending />) : <Navigate to="/login" /> },
     { path: "/buy", element: usr && usr.emailVerified ? <Layout><Buy /></Layout> : <Navigate to="/login" /> },
     { path: "/sell", element: usr && usr.emailVerified ? <Layout><Sell /></Layout> : <Navigate to="/login" /> },
-    { path: "/profile", element: usr && usr.emailVerified ? <Layout><Profile /></Layout> : <Navigate to="/login" /> },
+    { path: "/messages", element: usr && usr.emailVerified ? <Layout><Messages /></Layout> : <Navigate to="/login" /> },
+    { path: "/account", element: usr && usr.emailVerified ? <Layout><Account /></Layout> : <Navigate to="/login" /> },
+    { path: "/profile", element: <Navigate to="/account" replace /> },
+    { path: "/wishlist", element: <Navigate to="/account?tab=saved" replace /> },
+    { path: "/saved", element: <Navigate to="/account?tab=saved" replace /> },
     { path: "/contact", element: <Layout><Contact /></Layout> },
     { path: "/dashboard", element: usr && usr.emailVerified ? <Home /> : <Navigate to="/login" /> }
   ])
 
   return (
-    <div className='min-h-screen bg-white dark:bg-slate-900 dark:text-white transition-colors duration-300'>
-      <RouterProvider router={router} />
-      <Toaster 
-        toastOptions={{
-          className: 'dark:bg-slate-800 dark:text-white',
-          style: {
-            background: 'var(--toast-bg)',
-            color: 'var(--toast-color)',
-          },
-        }}
-      />
-    </div>
+    <WishlistProvider>
+      <div className='min-h-screen bg-white dark:bg-slate-900 dark:text-white transition-colors duration-300'>
+        <RouterProvider router={router} />
+        <Toaster 
+          toastOptions={{
+            className: 'dark:bg-slate-800 dark:text-white',
+            style: {
+              background: 'var(--toast-bg)',
+              color: 'var(--toast-color)',
+            },
+          }}
+        />
+      </div>
+    </WishlistProvider>
   )
 }

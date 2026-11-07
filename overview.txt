@@ -1,0 +1,163 @@
+Project Overview
+
+  This is a campus marketplace web app called MANIT Mart built as a React + Vite single-page application.
+  It is aimed at MANIT students buying and selling items like books, electronics, accessories,
+  stationery, and other second-hand goods. The app uses Firebase Authentication for login/signup, Cloud
+  Firestore for product and user data, Cloudinary for product image uploads, and Web3Forms for the
+  contact form. The main routing and auth gating live in src/App.jsx:42, Firebase setup is in src/
+  firebase.js:1, and the package/dependency setup is in package.json:1.
+
+  What the app does
+
+  The app has these user-facing flows:
+
+  - Home page: shows the navbar, landing banner, footer, and a “Latest on Campus” section that reads
+    recent products from Firestore. See src/Home/Home.jsx:1 and src/components/Banner.jsx:1.
+  - Signup: creates a Firebase user, restricts signup to @stu.manit.ac.in emails, creates a Firestore
+    user document, and sends email verification. See src/components/Signup.jsx:16.
+  - Login: signs in with email/password and uses Firebase session persistence for the browser session.
+    See src/components/Login.jsx:1.
+  - Verification flow: users who are logged in but not email-verified are redirected to a pending-
+    verification page where they can resend the email and manually re-check verification status. See src/
+    components/VerificationPending.jsx:1.
+  - Buy page: authenticated and verified users can browse listings with search, category, condition,
+    sorting, price range filters, and incremental loading. See src/components/Buy.jsx:14.
+  - Sell page: authenticated users can create, edit, and delete their own listings, with up to 5 images
+    per product uploaded to Cloudinary. See src/components/Sell.jsx:10.
+  - Profile page: users can view and edit their name and hostel, while email and role are displayed from
+    Firebase/Firestore. See src/components/Profile.jsx:27.
+  - Contact page: sends a form submission to Web3Forms using an access key from env vars. See src/
+    components/Contact.jsx:13.
+
+  Architecture and stack
+
+  - Frontend: React 18, React Router 6, Vite.
+  - Styling: Tailwind CSS with DaisyUI, dark mode via class toggling and localStorage. See
+    tailwind.config.js:1 and src/App.jsx:29.
+  - Notifications: react-hot-toast.
+  - Backend services: Firebase Auth + Firestore.
+  - Image hosting: Cloudinary unsigned uploads from the browser. See src/utils/imageUpload.js:8.
+  - Form handling: direct fetch to Web3Forms, not a custom backend.
+  - Hosting/deployment: Firebase Hosting serves the built dist folder and rewrites all routes to
+    index.html for SPA routing. Firestore region is asia-south1. See firebase.json:4.
+
+  Routing and access control
+
+  The app uses client-side route protection in src/App.jsx:42:
+
+  - / and /contact are public.
+  - /login and /signup redirect authenticated users away.
+  - /verify-pending is only for logged-in but unverified users.
+  - /buy, /sell, /profile, and /dashboard require a logged-in and email-verified user.
+
+  There is also theme initialization from localStorage in the app root and repeated theme handling in the
+  navbar.
+
+  Data model
+
+  From the code, the main Firestore collections are:
+
+  - users
+      - name
+      - hostel
+      - role
+      - email
+  - products
+      - title
+      - category
+      - price
+      - condition
+      - description
+      - imageUrls
+      - sellerId
+      - sellerName
+      - sellerEmail
+      - createdAt
+      - updatedAt
+      - interested
+
+  Product image handling is normalized through src/utils/productImages.js:1, which supports legacy fields
+  like image, imageUrl, images, and the current imageUrls.
+
+  UI behavior
+
+  - The navbar is sticky, responsive, and contains dark mode toggle plus auth-aware login/logout
+    behavior. See src/components/Navbar.jsx:1.
+  - Product cards show a small image gallery, seller info, and a Gmail compose link to contact the
+    seller. See src/components/BookCard.jsx:1.
+  - Clicking a product card opens a modal-like full product detail/image view.
+  - Buy-page pagination is manual “Load More”; it fetches Firestore pages of 20 and expands filtered
+    results in smaller visible batches. See src/components/Buy.jsx:14.
+
+  Environment/config required
+
+  From .env.example:1, the app expects:
+
+  - Firebase keys: VITE_FIREBASE_*
+  - Web3Forms key: VITE_ACCESS_KEY
+  - Cloudinary config:
+      - VITE_CLOUDINARY_CLOUD_NAME
+      - VITE_CLOUDINARY_UPLOAD_PRESET
+      - VITE_CLOUDINARY_FOLDER
+
+  Cloudinary setup notes are documented in CLOUDINARY_SETUP.md:1.
+
+  Security model
+
+  Firestore rules currently allow any authenticated user to read and write all documents:
+
+  - firestore.rules:17
+
+  That means client-side route protection exists, but database-level authorization is still broad. For a
+  real production app, product ownership and user-document access should be constrained in Firestore
+  rules.
+
+  Current strengths
+
+  - Clear separation of auth, buy, sell, profile, and contact flows.
+  - Modern SPA stack with simple deployment.
+  - Multi-image listing support.
+  - Email verification gate for marketplace access.
+  - Responsive layout and dark mode.
+  - No custom backend server required for core flows.
+
+  Current gaps / inconsistencies
+
+  - README.md is partly stale and describes some things more broadly than current code.
+  - GoogleAuthProvider is initialized in Firebase config but not actually used in the UI.
+  - The banner’s product/seller stats are randomized, not derived from real data. See src/components/
+    Banner.jsx:19.
+  - Some debug leftovers exist, including window.alert(...) and console logs in signup/verification flow.
+  - Firestore rules are too permissive for production.
+  - Footer links are placeholders.
+  - There is no chat, payment flow, admin dashboard, or test suite in the repo.
+  - There is minor encoding/mojibake in some rupee/cross/heart characters, visible in source and README.
+
+  Project structure
+
+  Key folders/files:
+
+  - src/
+      - App.jsx app bootstrapping and routing
+      - firebase.js Firebase initialization
+      - Home/Home.jsx home composition
+      - components/ main pages and shared UI
+      - utils/ image + Cloudinary helpers
+  - public/ static assets
+  - firebase.json, firestore.rules, firestore.indexes.json Firebase deployment/config
+  - .env.example env variable template
+  - dist/ built output for hosting
+
+  Bottom line
+
+  This project is a student-only marketplace frontend with Firebase-backed auth/data and Cloudinary image
+  uploads, designed for MANIT campus trading. It is functional as an MVP: users can register with
+  institute email, verify their account, manage profile info, create listings with images, browse/filter
+  products, and contact sellers. The main missing pieces are stronger database authorization, cleanup of
+  debug code, and a few product-level features that the README implies but the code does not fully
+  implement.
+
+  If you want, I can turn this into either:
+
+  1. a polished project report / documentation file, or
+  2. a module-by-module code walkthrough.
