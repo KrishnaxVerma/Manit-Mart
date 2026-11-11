@@ -1,8 +1,10 @@
 import { useState, useEffect, useRef } from 'react'
 import { auth, db } from '../firebase'
-import { doc, getDoc } from 'firebase/firestore'
+import { doc, getDoc, onSnapshot, deleteDoc, updateDoc, serverTimestamp } from 'firebase/firestore'
 import { useChat } from '../hooks/useChat'
 import toast from 'react-hot-toast'
+import PaymentModal from './chat/PaymentModal'
+import VerifyOtpModal from './chat/VerifyOtpModal'
 
 /**
  * Format Firestore timestamp or Date into human-readable time string.
@@ -67,14 +69,21 @@ export default function ChatModal({
   const [inputText, setInputText] = useState('')
   const [sending, setSending] = useState(false)
   const [showOfferModal, setShowOfferModal] = useState(false)
+  const [showPaymentModal, setShowPaymentModal] = useState(false)
+  const [showVerifyModal, setShowVerifyModal] = useState(false)
   const [offerInput, setOfferInput] = useState('')
   const [counterpartyName, setCounterpartyName] = useState(initialCounterpartyName || '')
+  const [productData, setProductData] = useState(null)
+  const [convData, setConvData] = useState(null)
   const inputRef = useRef(null)
 
   const currentUserId = auth.currentUser?.uid
   const isSeller = currentUserId === conversation?.sellerId
   const counterpartyId = isSeller ? conversation?.buyerId : conversation?.sellerId
   const counterpartyRole = isSeller ? 'Buyer' : 'Seller'
+  const productStatus = productData?.status || 'AVAILABLE'
+  const isReserved = productStatus === 'RESERVED'
+  const isSold = productStatus === 'SOLD'
 
   const {
     messages,
@@ -86,6 +95,15 @@ export default function ChatModal({
     scrollToBottom
   } = useChat(conversation?.id, { otherParticipantId: counterpartyId })
 
+  // Find latest accepted offer or resolved deal price
+  const acceptedOfferMsg = [...messages].reverse().find((m) => m.isOffer && m.status === 'ACCEPTED')
+  const currentDealPrice =
+    convData?.dealPrice ||
+    productData?.dealPrice ||
+    (acceptedOfferMsg ? Number(acceptedOfferMsg.offerAmount) : null) ||
+    Number(conversation?.listingPrice) ||
+    0
+
   // Focus input on open
   useEffect(() => {
     if (isOpen) {
@@ -95,6 +113,42 @@ export default function ChatModal({
       }, 150)
     }
   }, [isOpen, scrollToBottom])
+
+  // Track live product state (status, handshakeOtp, buyerId, etc.)
+  useEffect(() => {
+    if (!conversation?.listingId) return
+
+    const productRef = doc(db, 'products', conversation.listingId)
+    const unsub = onSnapshot(
+      productRef,
+      (docSnap) => {
+        if (docSnap.exists()) {
+          setProductData({ id: docSnap.id, ...docSnap.data() })
+        }
+      },
+      (err) => console.error('Failed to subscribe to product updates:', err)
+    )
+
+    return () => unsub()
+  }, [conversation?.listingId])
+
+  // Track live conversation updates (dealPrice, lastMessage, etc.)
+  useEffect(() => {
+    if (!conversation?.id) return
+
+    const convRef = doc(db, 'conversations', conversation.id)
+    const unsub = onSnapshot(
+      convRef,
+      (docSnap) => {
+        if (docSnap.exists()) {
+          setConvData({ id: docSnap.id, ...docSnap.data() })
+        }
+      },
+      (err) => console.error('Failed to subscribe to conversation updates:', err)
+    )
+
+    return () => unsub()
+  }, [conversation?.id])
 
   // Resolve counterparty name if not passed in
   useEffect(() => {
@@ -166,6 +220,65 @@ export default function ChatModal({
     }
   }
 
+  // Handle Accepting an Offer
+  const handleAcceptOffer = async (msg) => {
+    try {
+      const acceptedPrice = Number(msg.offerAmount)
+      if (!acceptedPrice) return
+
+      // 1. Mark message as ACCEPTED in messages subcollection
+      const msgRef = doc(db, 'conversations', conversation.id, 'messages', msg.id)
+      await updateDoc(msgRef, {
+        status: 'ACCEPTED',
+        acceptedAt: serverTimestamp()
+      })
+
+      // 2. Persist dealPrice to conversation document
+      const convRef = doc(db, 'conversations', conversation.id)
+      await updateDoc(convRef, {
+        dealPrice: acceptedPrice,
+        lastMessage: `🤝 Offer accepted: ₹${acceptedPrice.toLocaleString('en-IN')}`,
+        lastUpdated: serverTimestamp()
+      })
+
+      // 3. Persist dealPrice to product document
+      if (conversation.listingId) {
+        const productRef = doc(db, 'products', conversation.listingId)
+        await updateDoc(productRef, {
+          dealPrice: acceptedPrice
+        }).catch(() => {})
+      }
+
+      // 4. Send chat notification
+      await sendMessage(
+        `🤝 I accepted your offer of ₹${acceptedPrice.toLocaleString(
+          'en-IN'
+        )}! The payment price is now updated to ₹${acceptedPrice.toLocaleString('en-IN')}.`
+      )
+
+      toast.success(`Offer of ₹${acceptedPrice.toLocaleString('en-IN')} accepted! Deal price updated.`, { icon: '🎉' })
+    } catch (err) {
+      console.error('Failed to accept offer:', err)
+      toast.error('Failed to accept offer. Please try again.')
+    }
+  }
+
+  // Safe close handler that cleans up empty uninitiated chat drafts
+  const handleCloseModal = async () => {
+    if (
+      conversation?.id &&
+      messages.length === 0 &&
+      (!conversation.lastMessage || conversation.lastMessage.trim() === '')
+    ) {
+      try {
+        await deleteDoc(doc(db, 'conversations', conversation.id))
+      } catch (err) {
+        // Silently ignore if already cleaned up or rule issue
+      }
+    }
+    if (onClose) onClose()
+  }
+
   // Quick preset calculation for offers
   const calculatePreset = (percentage) => {
     const base = Number(conversation?.listingPrice) || 0
@@ -178,7 +291,7 @@ export default function ChatModal({
   return (
     <div
       className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-2 sm:p-4 animate-in fade-in duration-200"
-      onClick={onClose}
+      onClick={handleCloseModal}
       role="dialog"
       aria-modal="true"
     >
@@ -210,9 +323,20 @@ export default function ChatModal({
                 <h3 className="text-base font-semibold text-gray-900 dark:text-white truncate">
                   {conversation.listingTitle || 'Listing Chat'}
                 </h3>
-                <span className="text-sm font-bold text-blue-600 dark:text-blue-400 shrink-0">
-                  ₹{Number(conversation.listingPrice || 0).toLocaleString('en-IN')}
-                </span>
+                {currentDealPrice > 0 && currentDealPrice !== Number(conversation.listingPrice) ? (
+                  <div className="flex items-baseline gap-1.5 shrink-0">
+                    <span className="text-sm font-black text-emerald-600 dark:text-emerald-400">
+                      ₹{Number(currentDealPrice).toLocaleString('en-IN')}
+                    </span>
+                    <span className="text-xs line-through opacity-50 text-gray-500">
+                      ₹{Number(conversation.listingPrice || 0).toLocaleString('en-IN')}
+                    </span>
+                  </div>
+                ) : (
+                  <span className="text-sm font-bold text-blue-600 dark:text-blue-400 shrink-0">
+                    ₹{Number(conversation.listingPrice || 0).toLocaleString('en-IN')}
+                  </span>
+                )}
               </div>
               <div className="flex items-center gap-2 text-xs text-gray-500 dark:text-gray-400">
                 <span className="inline-block w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
@@ -222,13 +346,18 @@ export default function ChatModal({
                     {counterpartyName || 'Student'}
                   </strong>
                 </span>
+                {currentDealPrice > 0 && currentDealPrice !== Number(conversation.listingPrice) && (
+                  <span className="badge badge-success badge-xs text-white font-bold ml-1">
+                    Offer Agreed
+                  </span>
+                )}
               </div>
             </div>
           </div>
 
           {/* Close Button */}
           <button
-            onClick={onClose}
+            onClick={handleCloseModal}
             className="btn btn-ghost btn-circle btn-sm text-gray-500 hover:text-gray-900 dark:text-gray-400 dark:hover:text-white"
             aria-label="Close chat"
           >
@@ -243,6 +372,59 @@ export default function ChatModal({
             </svg>
           </button>
         </div>
+
+        {/* ================= STATUS / HANDSHAKE BANNERS ================= */}
+        {isSold && (
+          <div className="bg-emerald-50 dark:bg-emerald-950/40 border-b border-emerald-200 dark:border-emerald-800/60 px-4 py-2.5 flex items-center justify-between gap-3 text-emerald-800 dark:text-emerald-200 text-xs shrink-0 animate-in fade-in">
+            <div className="flex items-center gap-2 font-medium">
+              <span className="text-base">🎉</span>
+              <span>This item has been successfully completed and marked as <strong>SOLD</strong>.</span>
+            </div>
+            <span className="badge badge-success badge-sm text-white font-bold tracking-wide">COMPLETED</span>
+          </div>
+        )}
+
+        {isReserved && !isSeller && productData?.buyerId === currentUserId && (
+          <div className="bg-blue-50 dark:bg-blue-950/40 border-b border-blue-200 dark:border-blue-800/60 p-3 sm:px-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-blue-900 dark:text-blue-100 shrink-0 animate-in fade-in">
+            <div>
+              <div className="flex items-center gap-2 font-bold text-xs">
+                <span className="badge badge-primary badge-xs uppercase tracking-wide">Reserved For You</span>
+                <span>Payment & Handshake in Progress</span>
+              </div>
+              <p className="text-[11px] text-blue-700 dark:text-blue-300 mt-0.5">
+                Share this 4-digit OTP with the seller <u>only after</u> receiving and verifying the item:
+              </p>
+            </div>
+            <div className="flex items-center gap-2 self-start sm:self-auto bg-white dark:bg-slate-800 border-2 border-blue-400 dark:border-blue-600 px-3.5 py-1.5 rounded-xl shadow-xs">
+              <span className="text-xs text-gray-500 dark:text-gray-400 font-semibold uppercase">OTP:</span>
+              <span className="text-lg font-extrabold tracking-widest font-mono text-blue-600 dark:text-blue-400">
+                {productData?.handshakeOtp || '••••'}
+              </span>
+            </div>
+          </div>
+        )}
+
+        {isReserved && isSeller && productData?.buyerId === counterpartyId && (
+          <div className="bg-amber-50 dark:bg-amber-950/40 border-b border-amber-200 dark:border-amber-800/60 p-3 sm:px-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-amber-900 dark:text-amber-100 shrink-0 animate-in fade-in">
+            <div>
+              <div className="flex items-center gap-2 font-bold text-xs">
+                <span className="badge badge-warning badge-xs uppercase tracking-wide">Action Required</span>
+                <span>Buyer Initiated Payment</span>
+              </div>
+              <p className="text-[11px] text-amber-700 dark:text-amber-300 mt-0.5">
+                Handover the item to the buyer, ask for their 4-digit OTP, and confirm completion.
+              </p>
+            </div>
+            <button
+              type="button"
+              onClick={() => setShowVerifyModal(true)}
+              className="btn btn-warning btn-sm rounded-xl font-bold gap-1.5 shadow-xs whitespace-nowrap self-start sm:self-auto"
+            >
+              <span>🤝</span>
+              <span>Verify Buyer OTP</span>
+            </button>
+          </div>
+        )}
 
         {/* ================= MESSAGE FEED ================= */}
         <div className="flex-1 overflow-y-auto p-4 space-y-4 bg-gray-50/50 dark:bg-slate-950/40">
@@ -344,18 +526,17 @@ export default function ChatModal({
                         </div>
                       )}
 
-                      {!isSentByMe && (
+                      {msg.status === 'ACCEPTED' ? (
+                        <div className="flex items-center gap-1.5 pt-2 border-t border-emerald-300 dark:border-emerald-700 mt-2 text-emerald-700 dark:text-emerald-300 text-xs font-bold">
+                          <span>✓</span>
+                          <span>Offer Accepted! Deal Price Updated.</span>
+                        </div>
+                      ) : !isSentByMe ? (
                         <div className="flex gap-2 pt-2 border-t border-gray-200/40 dark:border-slate-700/60 mt-2">
                           <button
                             type="button"
-                            onClick={() => {
-                              sendMessage(
-                                `I accept your offer of ₹${Number(
-                                  msg.offerAmount
-                                ).toLocaleString('en-IN')}! When can we meet on campus?`
-                              )
-                            }}
-                            className="btn btn-xs btn-success text-white flex-1"
+                            onClick={() => handleAcceptOffer(msg)}
+                            className="btn btn-xs btn-success text-white flex-1 font-bold shadow-xs"
                           >
                             Accept Offer
                           </button>
@@ -370,7 +551,7 @@ export default function ChatModal({
                             Counter
                           </button>
                         </div>
-                      )}
+                      ) : null}
                     </div>
                   ) : (
                     /* Standard Message Bubble */
@@ -488,6 +669,46 @@ export default function ChatModal({
               <span className="hidden sm:inline">Make Offer</span>
             </button>
 
+            {/* Pay via UPI Button (Buyer only, when AVAILABLE) */}
+            {!isSeller && productStatus === 'AVAILABLE' && (
+              <button
+                type="button"
+                onClick={() => setShowPaymentModal(true)}
+                className="btn btn-sm btn-success text-white shrink-0 gap-1.5 shadow-xs transition"
+                title="Pay via dynamic UPI QR code"
+              >
+                <svg
+                  xmlns="http://www.w3.org/2000/svg"
+                  className="h-4 w-4"
+                  fill="none"
+                  viewBox="0 0 24 24"
+                  stroke="currentColor"
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth="2"
+                    d="M17 9V7a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2m2 4h10a2 2 0 002-2v-6a2 2 0 00-2-2H9a2 2 0 00-2 2v6a2 2 0 002 2zm7-5a2 2 0 11-4 0 2 2 0 014 0z"
+                  />
+                </svg>
+                <span className="hidden sm:inline font-semibold">Pay via UPI</span>
+                <span className="sm:hidden font-semibold">Pay</span>
+              </button>
+            )}
+
+            {/* Verify OTP Button (Seller only, when RESERVED) */}
+            {isSeller && isReserved && (
+              <button
+                type="button"
+                onClick={() => setShowVerifyModal(true)}
+                className="btn btn-sm btn-warning text-gray-900 shrink-0 gap-1.5 font-bold shadow-xs transition"
+                title="Verify Handshake OTP"
+              >
+                <span>🤝</span>
+                <span className="hidden sm:inline">Verify OTP</span>
+              </button>
+            )}
+
             {/* Text Input */}
             <input
               ref={inputRef}
@@ -522,6 +743,30 @@ export default function ChatModal({
             🔒 Safe Campus Trading: Coordinate handover in public areas (Hostel Main Gate, Library, SAC).
           </div>
         </div>
+
+        {/* Dynamic Payment Modal (Buyer) */}
+        <PaymentModal
+          isOpen={showPaymentModal}
+          onClose={() => setShowPaymentModal(false)}
+          conversation={conversation}
+          defaultAmount={currentDealPrice}
+          sendMessage={sendMessage}
+          onPaymentInitiated={() => {
+            setShowPaymentModal(false)
+          }}
+        />
+
+        {/* Handshake Verification Modal (Seller) */}
+        <VerifyOtpModal
+          isOpen={showVerifyModal}
+          onClose={() => setShowVerifyModal(false)}
+          listingId={conversation.listingId}
+          listingTitle={conversation.listingTitle}
+          sendMessage={sendMessage}
+          onVerified={() => {
+            setShowVerifyModal(false)
+          }}
+        />
       </div>
     </div>
   )

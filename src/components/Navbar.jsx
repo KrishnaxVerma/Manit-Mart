@@ -40,6 +40,7 @@ function Navbar() {
         let total = 0
         snapshot.docs.forEach((docSnap) => {
           const data = docSnap.data()
+          if (!data.lastMessage || data.lastMessage.trim() === '') return
           const count = data.unreadCount?.[usr.uid] || 0
           total += count
         })

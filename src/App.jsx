@@ -14,6 +14,7 @@ import Contact from './components/Contact'
 import Layout from './components/Layout'
 import Messages from './components/Messages'
 import Account from './components/Account'
+import OrdersHistory from './components/OrdersHistory'
 import { WishlistProvider } from './context/WishlistContext'
 
 export default function App() {
@@ -51,6 +52,8 @@ export default function App() {
     { path: "/sell", element: usr && usr.emailVerified ? <Layout><Sell /></Layout> : <Navigate to="/login" /> },
     { path: "/messages", element: usr && usr.emailVerified ? <Layout><Messages /></Layout> : <Navigate to="/login" /> },
     { path: "/account", element: usr && usr.emailVerified ? <Layout><Account /></Layout> : <Navigate to="/login" /> },
+    { path: "/orders", element: usr && usr.emailVerified ? <Layout><OrdersHistory /></Layout> : <Navigate to="/login" /> },
+    { path: "/history", element: usr && usr.emailVerified ? <Layout><OrdersHistory /></Layout> : <Navigate to="/login" /> },
     { path: "/profile", element: <Navigate to="/account" replace /> },
     { path: "/wishlist", element: <Navigate to="/account?tab=saved" replace /> },
     { path: "/saved", element: <Navigate to="/account?tab=saved" replace /> },

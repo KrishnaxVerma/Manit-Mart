@@ -7,6 +7,8 @@ import { getOptimizedCloudinaryUrl } from '../utils/productImages'
 import ChatModal from './ChatModal'
 import toast from 'react-hot-toast'
 
+export const UPI_REGEX = /^[\w.-]+@[\w.-]+$/
+
 export default function Account() {
   const [searchParams, setSearchParams] = useSearchParams()
   const activeTabParam = searchParams.get('tab')
@@ -17,7 +19,8 @@ export default function Account() {
   const [prof, setProf] = useState(null)
   const [profileLoading, setProfileLoading] = useState(true)
   const [isEditing, setIsEditing] = useState(false)
-  const [frm, setFrm] = useState({ name: '', hostel: '' })
+  const [frm, setFrm] = useState({ name: '', hostel: '', upiId: '' })
+  const [upiError, setUpiError] = useState('')
 
   // Wishlist States
   const { wishlistItems, loading: wishlistLoading, toggleWishlist } = useWishlist()
@@ -55,12 +58,22 @@ export default function Account() {
           if (docSnap.exists()) {
             const data = docSnap.data()
             setProf(data)
-            setFrm({ name: data.name || '', hostel: data.hostel || '' })
+            setFrm({
+              name: data.name || '',
+              hostel: data.hostel || '',
+              upiId: data.upiId || ''
+            })
           } else {
-            const defaultData = { name: '', hostel: '', role: 'student', email: usr.email }
-            await setDoc(docRef, defaultData)
+            const defaultData = {
+              name: '',
+              hostel: '',
+              upiId: '',
+              role: 'student',
+              email: usr.email
+            }
+            await setDoc(docRef, defaultData, { merge: true })
             setProf(defaultData)
-            setFrm({ name: '', hostel: '' })
+            setFrm({ name: '', hostel: '', upiId: '' })
           }
         } catch (err) {
           toast.error('Failed to load profile')
@@ -76,12 +89,25 @@ export default function Account() {
   // Profile Actions
   const handleSaveProfile = async () => {
     if (!u) return
+    const sanitizedUpi = frm.upiId.trim().toLowerCase()
+
+    if (sanitizedUpi && !UPI_REGEX.test(sanitizedUpi)) {
+      setUpiError('Invalid UPI ID format. Example: name@oksbi or 9876543210@paytm')
+      return
+    }
+
+    setUpiError('')
     try {
-      await updateDoc(doc(db, 'users', u.uid), {
+      const userRef = doc(db, 'users', u.uid)
+      const updatedData = {
         name: frm.name.trim(),
-        hostel: frm.hostel.trim()
-      })
-      setProf({ ...prof, name: frm.name.trim(), hostel: frm.hostel.trim() })
+        hostel: frm.hostel.trim(),
+        upiId: sanitizedUpi,
+        updatedAt: new Date()
+      }
+
+      await setDoc(userRef, updatedData, { merge: true })
+      setProf({ ...prof, ...updatedData })
       setIsEditing(false)
       toast.success('Profile updated successfully')
     } catch (err) {
@@ -90,7 +116,12 @@ export default function Account() {
   }
 
   const handleCancelProfile = () => {
-    setFrm({ name: prof?.name || '', hostel: prof?.hostel || '' })
+    setFrm({
+      name: prof?.name || '',
+      hostel: prof?.hostel || '',
+      upiId: prof?.upiId || ''
+    })
+    setUpiError('')
     setIsEditing(false)
   }
 
@@ -270,43 +301,62 @@ export default function Account() {
           </div>
 
           {/* ================= TABS SWITCHER ================= */}
-          <div className="mt-8 pt-6 border-t border-gray-100 dark:border-slate-700 flex justify-center sm:justify-start">
-            <div className="join bg-gray-100 dark:bg-slate-900 p-1.5 rounded-2xl w-full sm:w-auto">
+          <div className="mt-8 pt-6 border-t border-gray-100 dark:border-slate-700 flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3 sm:gap-4">
+            <div className="grid grid-cols-2 sm:flex bg-gray-100 dark:bg-slate-900 p-1.5 rounded-2xl w-full sm:w-auto gap-1.5">
               <button
                 type="button"
                 onClick={() => switchTab('profile')}
-                className={`join-item btn btn-sm flex-1 sm:flex-none border-none rounded-xl font-semibold gap-2 transition-all ${
+                className={`btn btn-sm border-none rounded-xl font-semibold gap-1.5 sm:gap-2 transition-all px-2.5 sm:px-4 ${
                   activeTab === 'profile'
                     ? 'btn-primary text-white shadow-xs'
                     : 'bg-transparent text-gray-600 dark:text-gray-300 hover:text-gray-900 dark:hover:text-white'
                 }`}
               >
-                <svg xmlns="http://www.w3.org/2000/svg" className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <svg xmlns="http://www.w3.org/2000/svg" className="w-4 h-4 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
                 </svg>
-                Profile & Details
+                <span className="text-xs sm:text-sm font-semibold truncate">
+                  <span className="inline sm:hidden">Profile</span>
+                  <span className="hidden sm:inline">Profile & Details</span>
+                </span>
               </button>
 
               <button
                 type="button"
                 onClick={() => switchTab('saved')}
-                className={`join-item btn btn-sm flex-1 sm:flex-none border-none rounded-xl font-semibold gap-2 transition-all ${
+                className={`btn btn-sm border-none rounded-xl font-semibold gap-1.5 sm:gap-2 transition-all px-2.5 sm:px-4 ${
                   activeTab === 'saved'
                     ? 'btn-primary text-white shadow-xs'
                     : 'bg-transparent text-gray-600 dark:text-gray-300 hover:text-gray-900 dark:hover:text-white'
                 }`}
               >
-                <svg xmlns="http://www.w3.org/2000/svg" className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <svg xmlns="http://www.w3.org/2000/svg" className="w-4 h-4 shrink-0 text-red-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z" />
                 </svg>
-                Saved Items
+                <span className="text-xs sm:text-sm font-semibold truncate">
+                  <span className="inline sm:hidden">Saved</span>
+                  <span className="hidden sm:inline">Saved Items</span>
+                </span>
                 {wishlistItems.length > 0 && (
-                  <span className={`badge badge-xs px-1.5 py-0.5 font-bold ${activeTab === 'saved' ? 'bg-white text-blue-600' : 'badge-primary text-white'}`}>
+                  <span className={`badge badge-xs px-1.5 py-0.5 font-bold shrink-0 ${activeTab === 'saved' ? 'bg-white text-blue-600' : 'badge-primary text-white'}`}>
                     {wishlistItems.length}
                   </span>
                 )}
               </button>
             </div>
+
+            <Link
+              to="/orders"
+              className="btn btn-sm bg-gray-100 hover:bg-gray-200 dark:bg-slate-700 dark:hover:bg-slate-600 text-gray-800 dark:text-gray-100 border-none rounded-2xl font-semibold gap-2 shadow-xs transition w-full sm:w-auto justify-center"
+            >
+              <svg xmlns="http://www.w3.org/2000/svg" className="w-4 h-4 text-emerald-600 dark:text-emerald-400 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
+              </svg>
+              <span className="text-xs sm:text-sm">My Orders & Sales</span>
+              <svg xmlns="http://www.w3.org/2000/svg" className="w-3.5 h-3.5 opacity-60 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 5l7 7-7 7" />
+              </svg>
+            </Link>
           </div>
         </div>
 
@@ -381,6 +431,49 @@ export default function Account() {
                 ) : (
                   <div className="px-4 py-3 rounded-xl bg-gray-50 dark:bg-slate-700/60 border border-gray-200 dark:border-slate-600 text-gray-900 dark:text-white font-medium">
                     {prof?.hostel || 'Not set'}
+                  </div>
+                )}
+              </div>
+
+              {/* UPI ID (Settlements) */}
+              <div>
+                <div className="flex items-center justify-between mb-1.5">
+                  <label className="block text-xs font-semibold uppercase tracking-wider text-gray-600 dark:text-gray-400">
+                    UPI ID (For Receiving Payments)
+                  </label>
+                  <span className="text-[10px] text-gray-400 font-mono">e.g. 9876543210@paytm</span>
+                </div>
+                {isEditing ? (
+                  <div>
+                    <input
+                      type="text"
+                      value={frm.upiId}
+                      onChange={(e) => {
+                        setFrm({ ...frm, upiId: e.target.value })
+                        if (upiError) setUpiError('')
+                      }}
+                      placeholder="e.g. yourname@oksbi"
+                      className={`input input-bordered w-full bg-white dark:bg-slate-700 text-gray-900 dark:text-white border-gray-300 dark:border-slate-600 focus:ring-2 focus:ring-blue-500 font-mono text-sm ${upiError ? 'border-error ring-1 ring-error' : ''}`}
+                    />
+                    {upiError && (
+                      <p className="text-xs text-error mt-1.5 font-medium">{upiError}</p>
+                    )}
+                    <p className="text-[11px] text-gray-400 mt-1">
+                      Required for creating listings and receiving instant buyer payments.
+                    </p>
+                  </div>
+                ) : (
+                  <div className="flex items-center justify-between px-4 py-3 rounded-xl bg-gray-50 dark:bg-slate-700/60 border border-gray-200 dark:border-slate-600">
+                    <span className="font-mono text-sm text-gray-900 dark:text-white font-medium">
+                      {prof?.upiId || (
+                        <span className="text-amber-500 dark:text-amber-400 font-sans italic text-xs">
+                          ⚠️ Not set (Required to post items for sale)
+                        </span>
+                      )}
+                    </span>
+                    {prof?.upiId && (
+                      <span className="badge badge-success badge-sm text-[10px] text-white">Active</span>
+                    )}
                   </div>
                 )}
               </div>

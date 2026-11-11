@@ -90,6 +90,11 @@ export default function Buy() {
   }
 
   const matchesFilters = (product, filters) => {
+    // Only display available items on the public feed (exclude RESERVED / SOLD)
+    if (product.status && product.status !== 'AVAILABLE') {
+      return false
+    }
+
     const normalizedSearch = filters.search.trim().toLowerCase()
     const normalizedCategory = String(product.category || '').trim().toLowerCase()
     const normalizedCondition = String(product.condition || '').trim().toLowerCase()

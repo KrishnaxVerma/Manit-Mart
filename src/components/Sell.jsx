@@ -6,6 +6,7 @@ import toast from 'react-hot-toast'
 import ProductCard from './BookCard'
 import { uploadMultipleImages } from '../utils/imageUpload'
 import { getProductImages } from '../utils/productImages'
+import OnboardingModal from './OnboardingModal'
 
 const MAX_IMAGES = 5
 const MAX_IMAGE_SIZE = 5 * 1024 * 1024
@@ -27,6 +28,9 @@ export default function Sell() {
   const [uploadingImages, setUploadingImages] = useState(false)
   const fileInputRef = useRef(null)
   const [frm, setFrm] = useState(createInitialForm)
+  const [sellerUpi, setSellerUpi] = useState(null)
+  const [checkingUpi, setCheckingUpi] = useState(true)
+  const [showUpiModal, setShowUpiModal] = useState(false)
   const nav = useNavigate()
 
   const categories = ['Books', 'Electronics', 'Accessories', 'Stationary', 'Others']
@@ -36,6 +40,23 @@ export default function Sell() {
       nav('/login')
       return
     }
+
+    // Check user's UPI ID for listing gating
+    const fetchUserUpi = async () => {
+      try {
+        const uDoc = await getDoc(doc(db, 'users', auth.currentUser.uid))
+        if (uDoc.exists() && uDoc.data()?.upiId) {
+          setSellerUpi(uDoc.data().upiId)
+        } else {
+          setSellerUpi(null)
+        }
+      } catch (err) {
+        console.error('Failed to fetch user UPI ID:', err)
+      } finally {
+        setCheckingUpi(false)
+      }
+    }
+    fetchUserUpi()
 
     const q = query(collection(db, 'products'), where('sellerId', '==', auth.currentUser.uid))
     const unsub = onSnapshot(q, (snap) => {
@@ -168,6 +189,12 @@ export default function Sell() {
     }
 
     setLd(true)
+    if (!sellerUpi) {
+      toast.error('Please configure your UPI ID before listing products so buyers can pay you.', { icon: '💳' })
+      setShowUpiModal(true)
+      return
+    }
+
     setUploadingImages(frm.imageFiles.length > 0)
     try {
       const userSnapshot = await getDoc(doc(db, 'users', auth.currentUser.uid))
@@ -207,7 +234,8 @@ export default function Sell() {
         await addDoc(collection(db, 'products'), {
           ...productData,
           createdAt: new Date(),
-          interested: []
+          interested: [],
+          status: 'AVAILABLE'
         })
         toast.success('Product listed successfully')
         setFrm(createInitialForm())
@@ -239,6 +267,27 @@ export default function Sell() {
       <div className="max-w-4xl mx-auto px-4">
         <h1 className="text-3xl font-bold text-gray-900 dark:text-white mb-2">Sell Products</h1>
         <p className="text-gray-600 dark:text-gray-300 mb-8">List your items for MANIT students</p>
+
+        {!checkingUpi && !sellerUpi && (
+          <div className="alert alert-warning shadow-sm rounded-2xl mb-8 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 border border-amber-300 dark:border-amber-600 bg-amber-50 dark:bg-amber-950/40 text-amber-900 dark:text-amber-200">
+            <div className="flex items-start gap-3">
+              <span className="text-2xl">⚠️</span>
+              <div>
+                <h3 className="font-bold text-sm">UPI ID Required to List Items</h3>
+                <p className="text-xs opacity-90 mt-0.5">
+                  To ensure safe peer-to-peer student transactions, you must add your UPI ID before publishing products.
+                </p>
+              </div>
+            </div>
+            <button
+              type="button"
+              onClick={() => setShowUpiModal(true)}
+              className="btn btn-warning btn-sm rounded-xl font-bold whitespace-nowrap self-end sm:self-center"
+            >
+              Add UPI ID Now
+            </button>
+          </div>
+        )}
 
         <div className="bg-white dark:bg-slate-800 rounded-lg border border-gray-200 dark:border-slate-700 p-6 mb-8">
           <h2 className="text-xl font-semibold mb-4 text-gray-900 dark:text-white">
@@ -423,6 +472,13 @@ export default function Sell() {
             </div>
           )}
         </div>
+
+        <OnboardingModal
+          isOpen={showUpiModal}
+          onClose={() => setShowUpiModal(false)}
+          currentUpi={sellerUpi || ''}
+          onSuccess={(newUpi) => setSellerUpi(newUpi)}
+        />
       </div>
     </div>
   )

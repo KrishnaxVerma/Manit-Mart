@@ -56,10 +56,13 @@ export default function Messages() {
     const unsubscribe = onSnapshot(
       q,
       (snapshot) => {
-        const list = snapshot.docs.map((docSnap) => ({
-          id: docSnap.id,
-          ...docSnap.data()
-        }))
+        const list = snapshot.docs
+          .map((docSnap) => ({
+            id: docSnap.id,
+            ...docSnap.data()
+          }))
+          // Only show conversations that have at least one message or offer exchanged
+          .filter((c) => Boolean(c.lastMessage && c.lastMessage.trim() !== ''))
 
         // Sort in memory by lastUpdated desc (avoids composite index requirement)
         list.sort((a, b) => {
