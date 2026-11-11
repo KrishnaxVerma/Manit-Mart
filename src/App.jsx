@@ -15,6 +15,7 @@ import Layout from './components/Layout'
 import Messages from './components/Messages'
 import Account from './components/Account'
 import OrdersHistory from './components/OrdersHistory'
+import ResetPassword from './pages/ResetPassword'
 import { WishlistProvider } from './context/WishlistContext'
 
 export default function App() {
@@ -46,6 +47,7 @@ export default function App() {
   const router = createBrowserRouter([
     { path: "/", element: <Home /> },
     { path: "/login", element: usr ? (usr.emailVerified ? <Navigate to="/dashboard" /> : <Navigate to="/verify-pending" />) : <Login /> },
+    { path: "/reset-password", element: <ResetPassword /> },
     { path: "/signup", element: usr ? (usr.emailVerified ? <Navigate to="/dashboard" /> : <Navigate to="/verify-pending" />) : <Signup /> },
     { path: "/verify-pending", element: usr ? (usr.emailVerified ? <Navigate to="/dashboard" /> : <VerificationPending />) : <Navigate to="/login" /> },
     { path: "/buy", element: usr && usr.emailVerified ? <Layout><Buy /></Layout> : <Navigate to="/login" /> },
