@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react'
+import { useState, useEffect } from 'react'
 import { Link } from 'react-router-dom'
 import { collection, onSnapshot } from 'firebase/firestore'
 import { db } from '../firebase'
@@ -11,8 +11,9 @@ export default function Banner() {
 
   useEffect(() => {
     const unsub = onSnapshot(collection(db, 'products'), (snap) => {
-      const data = snap.docs
-        .map(doc => ({ id: doc.id, ...doc.data() }))
+      const allProducts = snap.docs.map(doc => ({ id: doc.id, ...doc.data() }))
+      const activeProducts = allProducts.filter((product) => product.status === 'AVAILABLE')
+      const data = activeProducts
         .sort((a, b) => {
           const aTime = a.createdAt?.toDate?.()?.getTime?.() ?? 0
           const bTime = b.createdAt?.toDate?.()?.getTime?.() ?? 0
@@ -21,9 +22,9 @@ export default function Banner() {
         .slice(0, 3)
       setRecent(data)
       setStats({
-        products: Math.floor(Math.random() * 50) + 150,
-        sellers: Math.floor(Math.random() * 200) + 500,
-        categories: 5
+        products: activeProducts.length,
+        sellers: new Set(activeProducts.map((product) => product.sellerId).filter(Boolean)).size,
+        categories: new Set(activeProducts.map((product) => product.category).filter(Boolean)).size
       })
     })
     return unsub

@@ -7,9 +7,10 @@ import {
   query,
   startAfter,
 } from 'firebase/firestore'
-import { db, auth } from '../firebase'
+import { db } from '../firebase'
 import { useNavigate } from 'react-router-dom'
 import ProductCard from './BookCard'
+import { releaseExpiredLegacyReservation } from '../utils/reservations'
 
 const PAGE_SIZE = 20
 const FILTER_RESULTS_BATCH_SIZE = 5
@@ -61,6 +62,7 @@ export default function Buy() {
   const [loadingMore, setLoadingMore] = useState(false)
   const [lastVisible, setLastVisible] = useState(null)
   const [hasMore, setHasMore] = useState(false)
+  const [loadError, setLoadError] = useState('')
   const [visibleCount, setVisibleCount] = useState(FILTER_RESULTS_BATCH_SIZE)
   const nav = useNavigate()
   const requestIdRef = useRef(0)
@@ -90,7 +92,7 @@ export default function Buy() {
   }
 
   const matchesFilters = (product, filters) => {
-    // Only display available items on the public feed (exclude RESERVED / SOLD)
+    // Exclude sold items and legacy reservations until their five-minute hold expires.
     if (product.status && product.status !== 'AVAILABLE') {
       return false
     }
@@ -172,16 +174,32 @@ export default function Buy() {
     }
 
     try {
-      do {
+      if (reset) setLoadError('')
+      let reachedTarget = false
+      while (!reachedEnd && !reachedTarget) {
         const snapshot = await getDocs(buildProductsQuery(cursor))
 
         if (requestIdRef.current !== currentRequestId) {
           return
         }
 
-        const nextProducts = snapshot.docs.map((doc) => ({
-          id: doc.id,
-          ...doc.data(),
+        const nextProducts = await Promise.all(snapshot.docs.map(async (productDoc) => {
+          const product = { id: productDoc.id, ...productDoc.data() }
+          if (product.status === 'RESERVED') {
+            try {
+              if (await releaseExpiredLegacyReservation(product.id)) {
+                product.status = 'AVAILABLE'
+                delete product.buyerId
+                delete product.dealPrice
+                delete product.handshakeOtp
+                delete product.reservedAt
+                delete product.otpExpiresAt
+              }
+            } catch (error) {
+              console.error('Could not check an expired reservation:', error)
+            }
+          }
+          return product
         }))
 
         aggregatedProducts = reset
@@ -194,10 +212,8 @@ export default function Buy() {
           matchesFilters(product, filters)
         ).length
 
-        if (!hasResultLimitingFilters(filters) || matchingCount >= targetMatchCount || reachedEnd) {
-          break
-        }
-      } while (true)
+        reachedTarget = !hasResultLimitingFilters(filters) || matchingCount >= targetMatchCount
+      }
 
       setProducts(aggregatedProducts)
       setLastVisible(cursor)
@@ -209,6 +225,7 @@ export default function Buy() {
       }
     } catch (error) {
       if (requestIdRef.current === currentRequestId) {
+        setLoadError(error.message || 'Could not load listings. Please try again.')
         if (reset) {
           setProducts([])
         }
@@ -224,11 +241,6 @@ export default function Buy() {
   }
 
   useEffect(() => {
-    if (!auth.currentUser) {
-      nav('/login')
-      return
-    }
-
     requestIdRef.current += 1
     fetchProducts({
       reset: true,
@@ -429,6 +441,7 @@ export default function Buy() {
           Showing {visibleProducts.length} of {filteredProducts.length} matching products
         </div>
 
+        {loadError && <div className="alert alert-error mb-4" role="alert">{loadError}</div>}
         {visibleProducts.length === 0 ? (
           <div className="text-center py-16">
             <p className="text-gray-500 dark:text-gray-400">No products found matching your criteria</p>

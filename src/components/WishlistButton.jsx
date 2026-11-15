@@ -1,4 +1,4 @@
-import React, { useState } from 'react'
+import { useState } from 'react'
 import { useWishlist } from '../hooks/useWishlist'
 import { auth } from '../firebase'
 import toast from 'react-hot-toast'

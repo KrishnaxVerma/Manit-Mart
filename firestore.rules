@@ -1,190 +1,189 @@
 rules_version = '2';
 
-// ===============================================================
-// Assumed Data Model
-// ===============================================================
-//
-// Collection: conversations/{conversationId}
-// Document ID: Typically `{listingId}_{buyerId}`
-// Fields:
-//   - id: string (required, 1-100 chars, immutable)
-//   - listingId: string (required, 1-100 chars, immutable)
-//   - listingTitle: string (required, 0-200 chars)
-//   - listingPrice: number (required, >= 0)
-//   - listingImage: string (required, 0-1000 chars)
-//   - sellerId: string (required, 1-100 chars, immutable)
-//   - buyerId: string (required, 1-100 chars, immutable)
-//   - participants: list of strings (required, exactly 2 elements [sellerId, buyerId], immutable)
-//   - lastMessage: string (required, 0-2000 chars)
-//   - lastUpdated: timestamp (required)
-//   - unreadCount: map of string (userId) to number (required)
-//
-// Subcollection: conversations/{conversationId}/messages/{messageId}
-// Document ID: Auto-generated Firestore ID
-// Fields:
-//   - senderId: string (required, equals request.auth.uid)
-//   - text: string (required, 1-2000 chars)
-//   - createdAt: timestamp (required)
-//   - isOffer: bool (required)
-//   - offerAmount: number or null (optional/conditional: positive number if isOffer == true, null/omitted if false)
-//
-// Existing Collections (users, products, etc.):
-//   - Preserved with authenticated access for seamless marketplace operation
-//
-// ===============================================================
-
 service cloud.firestore {
   match /databases/{database}/documents {
-
-    // ===============================================================
-    // Helper Functions
-    // ===============================================================
-
-    // Check if the request is from an authenticated user
-    function isAuthenticated() {
-      return request.auth != null;
+    function verified() {
+      return request.auth != null && request.auth.token.email_verified == true;
     }
 
-    // Verify document contains only explicitly allowed fields
-    function hasOnlyAllowedFields(data, allowedFields) {
-      return data.keys().hasOnly(allowedFields);
+    function isParticipant(data) {
+      return verified() && request.auth.uid in data.participants;
     }
 
-    // Verify document contains all mandatory fields
-    function hasRequiredFields(data, requiredFields) {
-      return data.keys().hasAll(requiredFields);
-    }
-
-    // Check whether the authenticated user is a participant of the parent conversation
-    function isConversationParticipant(conversationId) {
-      return isAuthenticated() &&
-        exists(/databases/$(database)/documents/conversations/$(conversationId)) &&
-        request.auth.uid in get(/databases/$(database)/documents/conversations/$(conversationId)).data.participants;
-    }
-
-    // Domain validator for conversation documents (used in BOTH create and update)
-    function isValidConversation(data) {
-      return hasOnlyAllowedFields(data, [
+    function validConversation(data) {
+      return data.keys().hasOnly([
+               'id', 'listingId', 'listingTitle', 'listingPrice', 'listingImage',
+               'sellerId', 'buyerId', 'participants', 'lastMessage', 'lastUpdated',
+               'unreadCount', 'dealPrice'
+             ]) &&
+             data.keys().hasAll([
                'id', 'listingId', 'listingTitle', 'listingPrice', 'listingImage',
                'sellerId', 'buyerId', 'participants', 'lastMessage', 'lastUpdated', 'unreadCount'
              ]) &&
-             hasRequiredFields(data, [
-               'id', 'listingId', 'listingTitle', 'listingPrice', 'listingImage',
-               'sellerId', 'buyerId', 'participants', 'lastMessage', 'lastUpdated', 'unreadCount'
-             ]) &&
-             data.id is string && data.id.size() > 0 && data.id.size() <= 100 &&
-             data.listingId is string && data.listingId.size() > 0 && data.listingId.size() <= 100 &&
+             data.id is string && data.id.size() > 0 && data.id.size() <= 150 &&
+             data.listingId is string && data.listingId.size() > 0 &&
              data.listingTitle is string && data.listingTitle.size() <= 200 &&
              data.listingPrice is number && data.listingPrice >= 0 &&
-             data.listingImage is string && data.listingImage.size() <= 1000 &&
-             data.sellerId is string && data.sellerId.size() > 0 && data.sellerId.size() <= 100 &&
-             data.buyerId is string && data.buyerId.size() > 0 && data.buyerId.size() <= 100 &&
+             data.listingImage is string && data.listingImage.size() <= 2000 &&
+             data.sellerId is string && data.buyerId is string &&
+             data.sellerId != data.buyerId &&
              data.participants is list && data.participants.size() == 2 &&
              data.participants.hasAll([data.sellerId, data.buyerId]) &&
              data.lastMessage is string && data.lastMessage.size() <= 2000 &&
-             data.lastUpdated is timestamp &&
-             data.unreadCount is map;
+             data.lastUpdated is timestamp && data.unreadCount is map &&
+             (!('dealPrice' in data) || (data.dealPrice is number && data.dealPrice > 0));
     }
 
-    // Ensure critical conversation routing and identity fields cannot be modified on update
-    function areConversationImmutableFieldsUnchanged() {
-      return request.resource.data.id == resource.data.id &&
-             request.resource.data.listingId == resource.data.listingId &&
-             request.resource.data.sellerId == resource.data.sellerId &&
-             request.resource.data.buyerId == resource.data.buyerId &&
-             request.resource.data.participants == resource.data.participants;
-    }
-
-    // Domain validator for message documents (used in create)
-    function isValidMessage(data) {
-      return hasOnlyAllowedFields(data, ['senderId', 'text', 'createdAt', 'isOffer', 'offerAmount']) &&
-             hasRequiredFields(data, ['senderId', 'text', 'createdAt', 'isOffer']) &&
-             data.senderId is string && data.senderId.size() > 0 && data.senderId.size() <= 100 &&
+    function validMessage(data) {
+      return data.keys().hasOnly([
+               'senderId', 'text', 'createdAt', 'isOffer', 'offerAmount', 'status', 'acceptedAt'
+             ]) &&
+             data.keys().hasAll(['senderId', 'text', 'createdAt', 'isOffer']) &&
+             data.senderId == request.auth.uid &&
              data.text is string && data.text.size() > 0 && data.text.size() <= 2000 &&
-             data.createdAt is timestamp &&
-             data.isOffer is bool &&
-             (
-               (data.isOffer == true && data.offerAmount is number && data.offerAmount > 0) ||
-               (data.isOffer == false && (!('offerAmount' in data) || data.offerAmount == null))
-             );
+             data.createdAt is timestamp && data.isOffer is bool &&
+             (data.isOffer == false || (data.offerAmount is number && data.offerAmount > 0)) &&
+             (!('status' in data) || (data.isOffer == true && data.status == 'ACCEPTED')) &&
+             (!('acceptedAt' in data) || (data.isOffer == true && data.acceptedAt is timestamp));
     }
 
-    // ===============================================================
-    // Conversations Collection & Messages Subcollection
-    // ===============================================================
+    function validProduct(data) {
+      return data.keys().hasOnly([
+               'title', 'category', 'price', 'condition', 'description', 'imageUrls',
+               'sellerId', 'sellerName', 'sellerEmail', 'updatedAt', 'createdAt', 'interested',
+               'status', 'buyerId', 'handshakeOtp', 'dealPrice', 'reservedAt', 'otpExpiresAt', 'completedAt'
+             ]) &&
+             data.keys().hasAll([
+               'title', 'category', 'price', 'condition', 'description', 'imageUrls',
+               'sellerId', 'sellerName', 'sellerEmail', 'updatedAt', 'createdAt', 'status'
+             ]) &&
+             data.title is string && data.title.size() >= 3 && data.title.size() <= 120 &&
+             data.category is string && data.category.size() > 0 && data.category.size() <= 50 &&
+             data.price is number && data.price > 0 &&
+             data.condition is string && data.condition.size() > 0 && data.condition.size() <= 50 &&
+             data.description is string && data.description.size() <= 500 &&
+             data.imageUrls is list && data.imageUrls.size() > 0 && data.imageUrls.size() <= 5 &&
+             data.sellerId is string && data.sellerName is string && data.sellerEmail is string &&
+             data.status in ['AVAILABLE', 'RESERVED', 'SOLD'] &&
+             (data.status != 'RESERVED' || (
+               data.buyerId is string && data.handshakeOtp is string &&
+               data.handshakeOtp.matches('^[0-9]{4}$') && data.dealPrice is number &&
+               data.reservedAt is timestamp && data.otpExpiresAt is timestamp
+             ));
+    }
 
-    match /conversations/{conversationId} {
-      // Allow read/list only if the authenticated user is an active participant
-      allow read: if isAuthenticated() && request.auth.uid in resource.data.participants;
+    function reservationExpired(data) {
+      return ('otpExpiresAt' in data && data.otpExpiresAt <= request.time) ||
+        (!('otpExpiresAt' in data) &&
+          (!('reservedAt' in data) || data.reservedAt + duration.value(5, 'm') <= request.time));
+    }
 
-      // Allow conversation creation:
-      // - Must be authenticated
-      // - Document must satisfy schema and size constraints
-      // - Creator must be the buyer
-      // - Authenticated user must be in participants list
-      // - Participants must contain exactly 2 distinct members (buyer and seller)
-      allow create: if isAuthenticated() &&
-                    isValidConversation(request.resource.data) &&
-                    request.resource.data.buyerId == request.auth.uid &&
-                    request.auth.uid in request.resource.data.participants &&
-                    request.resource.data.participants.size() == 2 &&
-                    request.resource.data.sellerId != request.resource.data.buyerId;
-
-      // Allow updates (e.g. lastMessage, lastUpdated, unreadCount):
-      // - Must be an existing participant
-      // - Resulting document must remain valid
-      // - Crucial routing fields (id, listingId, sellerId, buyerId, participants) cannot be mutated
-      allow update: if isAuthenticated() &&
-                    request.auth.uid in resource.data.participants &&
-                    isValidConversation(request.resource.data) &&
-                    areConversationImmutableFieldsUnchanged();
-
-      // Deletes are strictly disallowed to maintain an immutable audit trail for campus trade safety
+    match /users/{userId} {
+      allow read: if verified();
+      allow create, update: if verified() && request.auth.uid == userId &&
+        request.resource.data.keys().hasOnly([
+          'name', 'hostel', 'role', 'email', 'createdAt', 'updatedAt', 'upiId', 'branch'
+        ]) &&
+        (!('upiId' in request.resource.data) || request.resource.data.upiId == '' ||
+          request.resource.data.upiId.matches('^[A-Za-z0-9._-]{2,}@[A-Za-z0-9.-]{2,}$'));
       allow delete: if false;
 
-      // Messages Subcollection
-      match /messages/{messageId} {
-        // Only participants in the parent conversation can read messages
-        allow read: if isConversationParticipant(conversationId);
-
-        // Allow message creation:
-        // - Authenticated user must be a participant in the parent conversation
-        // - Sender ID must match authenticated UID
-        // - Message data and offer amounts must be validated
-        allow create: if isConversationParticipant(conversationId) &&
-                      request.resource.data.senderId == request.auth.uid &&
-                      isValidMessage(request.resource.data);
-
-        // Messages are immutable once posted; updates and deletes are prohibited
-        allow update, delete: if false;
-      }
-    }
-
-    // ===============================================================
-    // Other Application Collections (users, products, etc.)
-    // ===============================================================
-
-    // Users profile collection & Wishlist subcollection
-    match /users/{userId} {
-      allow read, write: if isAuthenticated();
-
       match /wishlist/{listingId} {
-        allow read, write: if request.auth != null && request.auth.uid == userId;
+        allow read, delete: if verified() && request.auth.uid == userId;
+        allow create, update: if verified() && request.auth.uid == userId &&
+          request.resource.data.keys().hasOnly([
+            'listingId', 'addedPrice', 'savedAt', 'title', 'price', 'images',
+            'pickupLocation', 'sellerId', 'status'
+          ]) && request.resource.data.listingId == listingId;
       }
     }
 
-    // Products listings collection
     match /products/{productId} {
-      allow read, write: if isAuthenticated();
+      allow read: if verified();
+      allow create: if verified() && validProduct(request.resource.data) &&
+        request.resource.data.sellerId == request.auth.uid &&
+        request.resource.data.status == 'AVAILABLE' &&
+        !('buyerId' in request.resource.data) && !('handshakeOtp' in request.resource.data) &&
+        !('dealPrice' in request.resource.data) && !('reservedAt' in request.resource.data) &&
+          !('completedAt' in request.resource.data) && !('otpExpiresAt' in request.resource.data) &&
+        request.resource.data.keys().hasOnly([
+          'title', 'category', 'price', 'condition', 'description', 'imageUrls',
+          'sellerId', 'sellerName', 'sellerEmail', 'updatedAt', 'createdAt',
+          'interested', 'status'
+        ]) && request.resource.data.title is string && request.resource.data.title.size() >= 3 &&
+        request.resource.data.price is number && request.resource.data.price > 0 &&
+        request.resource.data.imageUrls is list && request.resource.data.imageUrls.size() > 0 &&
+        request.resource.data.imageUrls.size() <= 5;
+      allow update: if verified() && validProduct(request.resource.data) && (
+        (resource.data.sellerId == request.auth.uid && resource.data.status == 'AVAILABLE' &&
+          request.resource.data.sellerId == resource.data.sellerId &&
+          request.resource.data.status == 'AVAILABLE' &&
+          (!('otpExpiresAt' in resource.data) || resource.data.otpExpiresAt <= request.time) &&
+          request.resource.data.diff(resource.data).affectedKeys().hasOnly([
+            'title', 'category', 'price', 'condition', 'description', 'imageUrls', 'sellerName',
+            'sellerEmail', 'updatedAt'
+          ])) ||
+        (resource.data.status == 'AVAILABLE' && request.resource.data.status == 'AVAILABLE' &&
+          request.resource.data.buyerId == request.auth.uid &&
+          request.auth.uid != resource.data.sellerId &&
+          (!('otpExpiresAt' in resource.data) || resource.data.otpExpiresAt <= request.time ||
+            resource.data.buyerId == request.auth.uid) &&
+          request.resource.data.diff(resource.data).affectedKeys().hasOnly([
+            'buyerId', 'dealPrice', 'handshakeOtp', 'reservedAt', 'otpExpiresAt'
+          ]) && request.resource.data.dealPrice is number && request.resource.data.dealPrice > 0 &&
+          request.resource.data.handshakeOtp is string && request.resource.data.handshakeOtp.matches('^[0-9]{4}$') &&
+          request.resource.data.reservedAt is timestamp && request.resource.data.otpExpiresAt is timestamp &&
+          request.resource.data.otpExpiresAt > request.time &&
+          request.resource.data.otpExpiresAt <= request.time + duration.value(5, 'm') + duration.value(5, 's')) ||
+        (resource.data.status == 'RESERVED' && reservationExpired(resource.data) &&
+          request.resource.data.status == 'AVAILABLE' &&
+          request.resource.data.diff(resource.data).affectedKeys().hasOnly([
+            'status', 'buyerId', 'dealPrice', 'handshakeOtp', 'reservedAt', 'otpExpiresAt'
+          ]) && !('buyerId' in request.resource.data) && !('dealPrice' in request.resource.data) &&
+          !('handshakeOtp' in request.resource.data) && !('reservedAt' in request.resource.data) &&
+          !('otpExpiresAt' in request.resource.data)) ||
+        (resource.data.sellerId == request.auth.uid &&
+          resource.data.status in ['AVAILABLE', 'RESERVED'] &&
+          request.resource.data.status == 'SOLD' &&
+          resource.data.buyerId is string && resource.data.handshakeOtp is string &&
+          resource.data.otpExpiresAt is timestamp && resource.data.otpExpiresAt > request.time &&
+          request.resource.data.handshakeOtp == resource.data.handshakeOtp &&
+          request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status', 'completedAt']) &&
+          request.resource.data.completedAt is timestamp)
+      );
+      allow delete: if verified() && resource.data.sellerId == request.auth.uid &&
+        resource.data.status == 'AVAILABLE' &&
+        (!('otpExpiresAt' in resource.data) || resource.data.otpExpiresAt <= request.time);
     }
 
-    // Catch-all fallback for any other collections while strictly excluding conversations and wishlists
-    match /{collection}/{docId} {
-      allow read, write: if isAuthenticated() && collection != 'conversations';
-    }
+    match /conversations/{chatId} {
+      allow read: if isParticipant(resource.data);
+      allow create: if verified() && validConversation(request.resource.data) &&
+        request.resource.data.buyerId == request.auth.uid &&
+        exists(/databases/$(database)/documents/products/$(request.resource.data.listingId)) &&
+        get(/databases/$(database)/documents/products/$(request.resource.data.listingId)).data.sellerId == request.resource.data.sellerId &&
+        get(/databases/$(database)/documents/products/$(request.resource.data.listingId)).data.status == 'AVAILABLE';
+      allow update: if isParticipant(resource.data) && validConversation(request.resource.data) &&
+        request.resource.data.id == resource.data.id &&
+        request.resource.data.listingId == resource.data.listingId &&
+        request.resource.data.sellerId == resource.data.sellerId &&
+        request.resource.data.buyerId == resource.data.buyerId &&
+        request.resource.data.participants == resource.data.participants;
+      allow delete: if isParticipant(resource.data) && resource.data.lastMessage == '';
 
-    match /{collection}/{docId}/{subcollection}/{subDocId} {
-      allow read, write: if isAuthenticated() && collection != 'conversations' && subcollection != 'wishlist';
+      match /messages/{messageId} {
+        function parentParticipant() {
+          return verified() && exists(/databases/$(database)/documents/conversations/$(chatId)) &&
+            request.auth.uid in get(/databases/$(database)/documents/conversations/$(chatId)).data.participants;
+        }
+        allow read: if parentParticipant();
+        allow create: if parentParticipant() && validMessage(request.resource.data);
+        allow update: if parentParticipant() && resource.data.isOffer == true &&
+          resource.data.senderId != request.auth.uid &&
+          request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status', 'acceptedAt']) &&
+          request.resource.data.status == 'ACCEPTED' && request.resource.data.acceptedAt is timestamp;
+        allow delete: if false;
+      }
     }
   }
 }

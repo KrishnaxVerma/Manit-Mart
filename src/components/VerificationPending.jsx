@@ -3,6 +3,8 @@ import { reload, sendEmailVerification } from 'firebase/auth'
 import { auth } from '../firebase'
 import { useNavigate } from 'react-router-dom'
 import toast from 'react-hot-toast'
+import { doc, setDoc } from 'firebase/firestore'
+import { db } from '../firebase'
 
 export default function VerificationPending() {
   const [ld, setLd] = useState(false)
@@ -13,22 +15,16 @@ export default function VerificationPending() {
     const u = auth.currentUser
     if (!u) return
     
-    window.alert(u.email)
-    console.log('Resending to:', u.email)
-    console.log('Email verified:', u.emailVerified)
     
     setLd(true)
     try {
       const actionCodeSettings = {
-        url: 'https://manit-mart.web.app/verify-pending',
+        url: `${window.location.origin}/verify-email`,
         handleCodeInApp: true
       }
       await sendEmailVerification(u, actionCodeSettings)
       toast.success('Verification email sent')
     } catch (err) {
-      console.error('Resend error code:', err.code)
-      console.error('Resend error:', err.message)
-      window.alert(`Resend failed: ${err.code} - ${err.message}`)
       toast.error(err.message)
     }
     setLd(false)
@@ -41,8 +37,16 @@ export default function VerificationPending() {
     setChkLd(true)
     try {
       await reload(u)
-      console.log('After reload - Email verified:', u.emailVerified)
+      await u.getIdToken(true)
       if (u.emailVerified) {
+        const pendingProfile = localStorage.getItem(`pendingProfile:${u.uid}`)
+        if (pendingProfile) {
+          await setDoc(doc(db, 'users', u.uid), {
+            ...JSON.parse(pendingProfile),
+            createdAt: new Date()
+          })
+          localStorage.removeItem(`pendingProfile:${u.uid}`)
+        }
         toast.success('Email verified!')
         nav('/dashboard')
       } else {

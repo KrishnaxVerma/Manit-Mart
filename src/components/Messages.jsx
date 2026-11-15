@@ -43,7 +43,8 @@ export default function Messages() {
 
   useEffect(() => {
     if (!auth.currentUser) {
-      nav('/login')
+      setConversations([])
+      setLoading(false)
       return
     }
 

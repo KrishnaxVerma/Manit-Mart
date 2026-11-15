@@ -16,7 +16,7 @@ export default function Signup() {
 
   const isValidEmail = (email) => {
     const trimmed = email.trim().toLowerCase()
-    return trimmed.endsWith('@stu.manit.ac.in') || trimmed.endsWith('@manit.ac.in')
+    return /^[\w.-]+@stu\.manit\.ac\.in$/i.test(trimmed)
   }
 
   const sub = async (e) => {
@@ -24,7 +24,7 @@ export default function Signup() {
     const sanitizedEmail = em.trim().toLowerCase()
 
     if (!isValidEmail(sanitizedEmail)) {
-      toast.error('Only @stu.manit.ac.in or @manit.ac.in emails allowed')
+      toast.error('Only @stu.manit.ac.in student emails are allowed')
       return
     }
 
@@ -39,16 +39,18 @@ export default function Signup() {
       const u = cred.user
       const uid = u.uid
       
-      // Save user profile to Firestore
-      await setDoc(doc(db, 'users', uid), {
+      localStorage.setItem(`pendingProfile:${uid}`, JSON.stringify({
         name: nm.trim(),
         hostel: ht.trim(),
         role: 'student',
-        email: sanitizedEmail,
-        createdAt: new Date()
-      })
+        email: sanitizedEmail
+      }))
       
       if (u.emailVerified) {
+        await setDoc(doc(db, 'users', uid), {
+          name: nm.trim(), hostel: ht.trim(), role: 'student', email: sanitizedEmail, createdAt: new Date()
+        })
+        localStorage.removeItem(`pendingProfile:${uid}`)
         toast.success('Email already verified!', { icon: '🎉' })
         nav('/dashboard')
         return
@@ -58,7 +60,7 @@ export default function Signup() {
       try {
         const actionCodeSettings = {
           url: `${window.location.origin}/verify-pending`,
-          handleCodeInApp: true
+          handleCodeInApp: false
         }
         await sendEmailVerification(u, actionCodeSettings)
         toast.success('Account created! Please check your email for the verification link.', { icon: '📧' })

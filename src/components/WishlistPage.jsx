@@ -1,11 +1,12 @@
-import React, { useState, useEffect } from 'react'
+import { useState, useEffect } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
-import { doc, getDoc, setDoc, serverTimestamp, onSnapshot } from 'firebase/firestore'
+import { doc, onSnapshot } from 'firebase/firestore'
 import { db, auth } from '../firebase'
 import { useWishlist } from '../hooks/useWishlist'
 import { getOptimizedCloudinaryUrl } from '../utils/productImages'
 import ChatModal from './ChatModal'
 import toast from 'react-hot-toast'
+import { getOrCreateConversation } from '../utils/chatHelpers'
 
 export default function WishlistPage() {
   const { wishlistItems, loading: wishlistLoading, toggleWishlist } = useWishlist()
@@ -72,37 +73,12 @@ export default function WishlistPage() {
     setStartingChatId(listingId)
 
     try {
-      const chatId = `${listingId}_${currentUserId}`
-      const convRef = doc(db, 'conversations', chatId)
-      const convSnap = await getDoc(convRef)
-
-      let conversationData
-      if (convSnap.exists()) {
-        conversationData = { id: convSnap.id, ...convSnap.data() }
-      } else {
-        const primaryImage =
-          (liveData?.imageUrls && liveData.imageUrls[0]) ||
-          (item.images && item.images[0]) ||
-          ''
-
-        conversationData = {
-          id: chatId,
-          listingId: listingId,
-          listingTitle: liveData?.title || item.title || 'Product',
-          listingPrice: Number(liveData?.price ?? item.price) || 0,
-          listingImage: primaryImage,
-          sellerId: sellerId,
-          buyerId: currentUserId,
-          participants: [sellerId, currentUserId],
-          lastMessage: '',
-          lastUpdated: serverTimestamp(),
-          unreadCount: {
-            [sellerId]: 0,
-            [currentUserId]: 0
-          }
-        }
-        await setDoc(convRef, conversationData, { merge: true })
-      }
+      const conversationData = await getOrCreateConversation({
+        ...item,
+        ...liveData,
+        id: listingId,
+        sellerId
+      }, currentUserId)
 
       setActiveChat(conversationData)
       setIsChatOpen(true)
@@ -184,7 +160,7 @@ export default function WishlistPage() {
               Your wishlist is empty
             </h2>
             <p className="text-gray-500 dark:text-gray-400 max-w-md mx-auto mb-8 text-sm leading-relaxed">
-              Browse campus listings and save items you want to keep an eye on! We'll track price drops and alert you when prices fall.
+              Browse campus listings and save items you want to keep an eye on! We&apos;ll track price drops and alert you when prices fall.
             </p>
             <Link
               to="/buy"

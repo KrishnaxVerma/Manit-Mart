@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react'
+import { useState, useEffect } from 'react'
 import { collection, query, where, onSnapshot } from 'firebase/firestore'
 import { db, auth } from '../firebase'
 import { Link, useNavigate } from 'react-router-dom'
@@ -12,17 +12,21 @@ export default function OrdersHistory() {
   const [purchases, setPurchases] = useState([])
   const [sales, setSales] = useState([])
   const [loading, setLoading] = useState(true)
+  const [error, setError] = useState('')
   const nav = useNavigate()
 
   const currentUserId = auth.currentUser?.uid
 
   useEffect(() => {
     if (!auth.currentUser) {
-      nav('/login')
+      setPurchases([])
+      setSales([])
+      setLoading(false)
       return
     }
 
     setLoading(true)
+    setError('')
     const productsRef = collection(db, 'products')
 
     // Query 1: Purchases (buyerId == current user & status == 'SOLD')
@@ -61,6 +65,7 @@ export default function OrdersHistory() {
       },
       (err) => {
         console.error('Purchases query error:', err)
+        setError('Could not load purchase history.')
         purchasesLoaded = true
         checkDone()
       }
@@ -81,6 +86,7 @@ export default function OrdersHistory() {
       },
       (err) => {
         console.error('Sales query error:', err)
+        setError('Could not load sales history.')
         salesLoaded = true
         checkDone()
       }
@@ -210,6 +216,8 @@ export default function OrdersHistory() {
             <span className="loading loading-spinner loading-lg text-blue-600"></span>
             <p className="text-sm font-medium">Loading transaction history...</p>
           </div>
+        ) : error ? (
+          <div className="alert alert-error" role="alert">{error}</div>
         ) : activeTab === 'purchases' ? (
           purchases.length === 0 ? (
             <div className="bg-white dark:bg-slate-800 rounded-3xl border border-gray-200 dark:border-slate-700 p-12 text-center shadow-xs">

@@ -1,16 +1,16 @@
 import { useEffect, useState } from 'react'
-import { doc, getDoc, setDoc, serverTimestamp } from 'firebase/firestore'
+import { doc, getDoc } from 'firebase/firestore'
 import { getOptimizedCloudinaryUrl, getProductImages } from '../utils/productImages'
 import { db, auth } from '../firebase'
 import ChatModal from './ChatModal'
 import WishlistButton from './WishlistButton'
 import toast from 'react-hot-toast'
+import { getOrCreateConversation } from '../utils/chatHelpers'
 
 export default function ProductCard({ product }) {
   const [currentImg, setCurrentImg] = useState(0)
   const [showAllImages, setShowAllImages] = useState(false)
   const [ownerName, setOwnerName] = useState(product.sellerName || 'Unknown seller')
-  const [ownerEmail, setOwnerEmail] = useState(product.sellerEmail?.trim() || '')
   const [isChatOpen, setIsChatOpen] = useState(false)
   const [startingChat, setStartingChat] = useState(false)
   const [activeChat, setActiveChat] = useState(null)
@@ -27,7 +27,6 @@ export default function ProductCard({ product }) {
     let isMounted = true
 
     setOwnerName(product.sellerName || 'Unknown seller')
-    setOwnerEmail(product.sellerEmail?.trim() || '')
 
     const loadOwnerName = async () => {
       if (!product.sellerId) {
@@ -42,15 +41,11 @@ export default function ProductCard({ product }) {
         }
 
         const profileName = userSnapshot.data()?.name?.trim()
-        const profileEmail = userSnapshot.data()?.email?.trim()
 
         if (profileName) {
           setOwnerName(profileName)
         }
 
-        if (profileEmail) {
-          setOwnerEmail(profileEmail)
-        }
       } catch (error) {
         // Fall back to stored sellerName if lookup fails
       }
@@ -86,33 +81,7 @@ export default function ProductCard({ product }) {
 
     setStartingChat(true)
     try {
-      const chatId = `${product.id}_${currentUserId}`
-      const convRef = doc(db, 'conversations', chatId)
-      const convSnap = await getDoc(convRef)
-
-      let conversationData
-      if (convSnap.exists()) {
-        conversationData = { id: convSnap.id, ...convSnap.data() }
-      } else {
-        const primaryImage = getProductImages(product)[0] || ''
-        conversationData = {
-          id: chatId,
-          listingId: product.id,
-          listingTitle: product.title || 'Product',
-          listingPrice: Number(product.price) || 0,
-          listingImage: primaryImage,
-          sellerId: product.sellerId,
-          buyerId: currentUserId,
-          participants: [product.sellerId, currentUserId],
-          lastMessage: '',
-          lastUpdated: serverTimestamp(),
-          unreadCount: {
-            [product.sellerId]: 0,
-            [currentUserId]: 0
-          }
-        }
-        await setDoc(convRef, conversationData, { merge: true })
-      }
+      const conversationData = await getOrCreateConversation(product, currentUserId)
 
       setActiveChat(conversationData)
       setIsChatOpen(true)

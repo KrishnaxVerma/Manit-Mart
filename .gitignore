@@ -27,3 +27,15 @@ dist-ssr
 *.njsproj
 *.sln
 *.sw?
+
+__pycache__/
+*.pyc
+
+# Project Presentations, Reports & Automation Artifacts
+docs_and_presentation/
+presentation_and_report/
+*.pptx
+playwright_profile/
+screenshots/
+diagrams/
+

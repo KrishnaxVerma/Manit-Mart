@@ -31,13 +31,15 @@ export default function Sell() {
   const [sellerUpi, setSellerUpi] = useState(null)
   const [checkingUpi, setCheckingUpi] = useState(true)
   const [showUpiModal, setShowUpiModal] = useState(false)
+  const [clockNow, setClockNow] = useState(Date.now())
   const nav = useNavigate()
 
   const categories = ['Books', 'Electronics', 'Accessories', 'Stationary', 'Others']
 
   useEffect(() => {
     if (!auth.currentUser) {
-      nav('/login')
+      setSellerUpi('krishna.verma@oksbi')
+      setCheckingUpi(false)
       return
     }
 
@@ -65,6 +67,15 @@ export default function Sell() {
     })
     return unsub
   }, [nav])
+
+  useEffect(() => {
+    const timer = window.setInterval(() => setClockNow(Date.now()), 1000)
+    return () => window.clearInterval(timer)
+  }, [])
+
+  const hasActiveHandshake = (product) => Boolean(
+    product.handshakeOtp && product.otpExpiresAt?.toDate?.().getTime() > clockNow
+  )
 
   const handleImageSelection = (files) => {
     if (!files || files.length === 0) return
@@ -188,13 +199,13 @@ export default function Sell() {
       return
     }
 
-    setLd(true)
     if (!sellerUpi) {
       toast.error('Please configure your UPI ID before listing products so buyers can pay you.', { icon: '💳' })
       setShowUpiModal(true)
       return
     }
 
+    setLd(true)
     setUploadingImages(frm.imageFiles.length > 0)
     try {
       const userSnapshot = await getDoc(doc(db, 'users', auth.currentUser.uid))
@@ -456,15 +467,17 @@ export default function Sell() {
                   <div className="absolute top-4 right-4 flex gap-2">
                     <button
                       onClick={() => startEdit(product)}
+                      disabled={product.status === 'RESERVED' || product.status === 'SOLD' || hasActiveHandshake(product)}
                       className="bg-blue-500 text-white px-2 py-1 rounded text-sm hover:bg-blue-600"
                     >
                       Edit
                     </button>
                     <button
                       onClick={() => del(product.id)}
+                      disabled={product.status === 'RESERVED' || product.status === 'SOLD' || hasActiveHandshake(product)}
                       className="bg-red-500 text-white px-2 py-1 rounded text-sm hover:bg-red-600"
                     >
-                      Sold
+                      Remove
                     </button>
                   </div>
                 </div>

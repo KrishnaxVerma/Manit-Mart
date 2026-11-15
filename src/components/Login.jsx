@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
 import {
-  browserSessionPersistence,
+  browserLocalPersistence,
   setPersistence,
   signInWithEmailAndPassword,
   sendPasswordResetEmail
@@ -10,7 +10,7 @@ import { useNavigate, Link, useSearchParams } from 'react-router-dom'
 import toast from 'react-hot-toast'
 
 // Strict institute email validation
-const INSTITUTION_EMAIL_REGEX = /^[\w.-]+@([\w-]+\.)*manit\.ac\.in$/i
+const INSTITUTION_EMAIL_REGEX = /^[\w.-]+@stu\.manit\.ac\.in$/i
 const GENERAL_EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
 
 export default function Login() {
@@ -38,12 +38,16 @@ export default function Login() {
   // Login submission
   const sub = async (e) => {
     e.preventDefault()
+    if (!INSTITUTION_EMAIL_REGEX.test(em.trim())) {
+      toast.error('Use your @stu.manit.ac.in student email address.')
+      return
+    }
     setLd(true)
     try {
-      await setPersistence(auth, browserSessionPersistence)
-      await signInWithEmailAndPassword(auth, em.trim(), pw)
+      await setPersistence(auth, browserLocalPersistence)
+      const credential = await signInWithEmailAndPassword(auth, em.trim(), pw)
       toast.success('Logged in successfully!', { icon: '👋' })
-      nav('/dashboard')
+      nav(credential.user.emailVerified ? '/dashboard' : '/verify-email')
     } catch (err) {
       console.error('Login error:', err)
       let msg = 'Failed to sign in. Please verify your credentials.'

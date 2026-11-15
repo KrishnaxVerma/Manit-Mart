@@ -21,7 +21,7 @@
 ## ✨ Key Features
 
 - 🔐 **Campus-Restricted Authentication & Security**
-  - Registration strictly gated to institutional emails (`@stu.manit.ac.in`).
+  - Registration and login are restricted to student institutional emails (`@stu.manit.ac.in`).
   - Firebase Authentication with mandatory email verification before accessing marketplace features (`/buy`, `/sell`, `/messages`, `/account`).
   - Secure password reset flow (`/reset-password`).
 
@@ -195,8 +195,6 @@ VITE_CLOUDINARY_CLOUD_NAME=your_cloudinary_cloud_name
 VITE_CLOUDINARY_UPLOAD_PRESET=manit_mart_products
 VITE_CLOUDINARY_FOLDER=manit_mart/products
 
-# Optional Backend Host URL
-VITE_HOSTURL=http://localhost:4001/
 ```
 
 > 📖 **Cloudinary Setup Note**: For step-by-step guidance on setting up an **Unsigned Upload Preset** (`manit_mart_products`), refer to [CLOUDINARY_SETUP.md](CLOUDINARY_SETUP.md).
@@ -241,6 +239,7 @@ In the project directory, you can run:
 
 - **Domain Restriction**: Only emails ending in `@stu.manit.ac.in` can create accounts, preventing unauthorized external access.
 - **Verification Gate**: Users must verify their email address before accessing product listings, publishing items, or sending messages.
+- **Handshake Expiry**: Handover OTPs are valid for five minutes. Listings remain available while an OTP is active, and expired codes can be replaced by a new buyer.
 - **Cloudinary Safe Uploads**: Client uploads are validated for file size (max 5 MB) and MIME types before dispatching to Cloudinary.
 - **Firestore Rules**: Granular Firestore security rules (`firestore.rules`) govern access controls to products, users, conversations, and transaction records.
 

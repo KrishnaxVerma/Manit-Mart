@@ -1,7 +1,7 @@
-import React, { useState } from 'react'
+import { useState } from 'react'
 import { createPortal } from 'react-dom'
 import { doc, runTransaction, serverTimestamp, deleteField } from 'firebase/firestore'
-import { db, auth } from '../../firebase'
+import { db } from '../../firebase'
 import toast from 'react-hot-toast'
 
 /**
@@ -45,7 +45,7 @@ export default function VerifyOtpModal({
       const productRef = doc(db, 'products', listingId)
 
       // Execute Firestore atomic runTransaction
-      await runTransaction(db, async (transaction) => {
+      const verified = await runTransaction(db, async (transaction) => {
         const productSnap = await transaction.get(productRef)
         if (!productSnap.exists()) {
           throw new Error('Listing document no longer exists.')
@@ -53,21 +53,40 @@ export default function VerifyOtpModal({
 
         const data = productSnap.data()
 
-        if (data.status !== 'RESERVED') {
-          throw new Error(`Listing is currently ${data.status || 'not reserved'}.`)
+        if (!['AVAILABLE', 'RESERVED'].includes(data.status) || !data.buyerId || !data.handshakeOtp) {
+          throw new Error(`There is no active buyer handover for this listing.`)
+        }
+
+        if (!data.otpExpiresAt || data.otpExpiresAt.toMillis() <= Date.now()) {
+          if (data.status === 'RESERVED') {
+            transaction.update(productRef, {
+              status: 'AVAILABLE',
+              buyerId: deleteField(),
+              dealPrice: deleteField(),
+              handshakeOtp: deleteField(),
+              reservedAt: deleteField(),
+              otpExpiresAt: deleteField()
+            })
+          }
+          return false
         }
 
         if (String(data.handshakeOtp).trim() !== sanitizedOtp) {
           throw new Error('Incorrect OTP. Please verify the 4-digit code shown on the buyer’s phone.')
         }
 
-        // Atomic update: transition to SOLD, record completion timestamp, remove handshakeOtp
+        // Keep the OTP fields unchanged so the Firestore completion rule can validate them.
         transaction.update(productRef, {
           status: 'SOLD',
-          completedAt: serverTimestamp(),
-          handshakeOtp: deleteField()
+          completedAt: serverTimestamp()
         })
+        return true
       })
+
+      if (!verified) {
+        setErrorMsg('This OTP expired. The listing is available for a new handover.')
+        return
+      }
 
       // Send automated system chat message
       if (sendMessage) {
@@ -124,7 +143,7 @@ export default function VerifyOtpModal({
         <form onSubmit={handleVerify} className="space-y-4">
           <div>
             <label className="block text-xs font-semibold uppercase tracking-wider text-gray-700 dark:text-gray-300 mb-1.5">
-              Enter Buyer's 4-Digit OTP
+              Enter Buyer&apos;s 4-Digit OTP
             </label>
             <input
               type="text"

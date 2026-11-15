@@ -6,7 +6,6 @@ import { Toaster } from 'react-hot-toast'
 import Home from './Home/Home'
 import Buy from './components/Buy'
 import Sell from './components/Sell'
-import Profile from './components/Profile'
 import Signup from './components/Signup'
 import Login from './components/Login'
 import VerificationPending from './components/VerificationPending'
@@ -16,15 +15,14 @@ import Messages from './components/Messages'
 import Account from './components/Account'
 import OrdersHistory from './components/OrdersHistory'
 import ResetPassword from './pages/ResetPassword'
+import ProtectedRoute from './components/ProtectedRoute'
 import { WishlistProvider } from './context/WishlistContext'
 
 export default function App() {
-  const [usr, setUsr] = useState(null)
   const [ld, setLd] = useState(true)
 
   useEffect(() => {
-    const unsub = onAuthStateChanged(auth, (u) => {
-      setUsr(u)
+    const unsub = onAuthStateChanged(auth, () => {
       setLd(false)
     })
     return unsub
@@ -46,21 +44,22 @@ export default function App() {
 
   const router = createBrowserRouter([
     { path: "/", element: <Home /> },
-    { path: "/login", element: usr ? (usr.emailVerified ? <Navigate to="/dashboard" /> : <Navigate to="/verify-pending" />) : <Login /> },
+    { path: "/login", element: <Login /> },
     { path: "/reset-password", element: <ResetPassword /> },
-    { path: "/signup", element: usr ? (usr.emailVerified ? <Navigate to="/dashboard" /> : <Navigate to="/verify-pending" />) : <Signup /> },
-    { path: "/verify-pending", element: usr ? (usr.emailVerified ? <Navigate to="/dashboard" /> : <VerificationPending />) : <Navigate to="/login" /> },
-    { path: "/buy", element: usr && usr.emailVerified ? <Layout><Buy /></Layout> : <Navigate to="/login" /> },
-    { path: "/sell", element: usr && usr.emailVerified ? <Layout><Sell /></Layout> : <Navigate to="/login" /> },
-    { path: "/messages", element: usr && usr.emailVerified ? <Layout><Messages /></Layout> : <Navigate to="/login" /> },
-    { path: "/account", element: usr && usr.emailVerified ? <Layout><Account /></Layout> : <Navigate to="/login" /> },
-    { path: "/orders", element: usr && usr.emailVerified ? <Layout><OrdersHistory /></Layout> : <Navigate to="/login" /> },
-    { path: "/history", element: usr && usr.emailVerified ? <Layout><OrdersHistory /></Layout> : <Navigate to="/login" /> },
+    { path: "/signup", element: <Signup /> },
+    { path: "/verify-pending", element: <VerificationPending /> },
+    { path: "/verify-email", element: <VerificationPending /> },
+    { path: "/buy", element: <ProtectedRoute><Layout><Buy /></Layout></ProtectedRoute> },
+    { path: "/sell", element: <ProtectedRoute><Layout><Sell /></Layout></ProtectedRoute> },
+    { path: "/messages", element: <ProtectedRoute><Layout><Messages /></Layout></ProtectedRoute> },
+    { path: "/account", element: <ProtectedRoute><Layout><Account /></Layout></ProtectedRoute> },
+    { path: "/orders", element: <ProtectedRoute><Layout><OrdersHistory /></Layout></ProtectedRoute> },
+    { path: "/history", element: <ProtectedRoute><Layout><OrdersHistory /></Layout></ProtectedRoute> },
     { path: "/profile", element: <Navigate to="/account" replace /> },
-    { path: "/wishlist", element: <Navigate to="/account?tab=saved" replace /> },
-    { path: "/saved", element: <Navigate to="/account?tab=saved" replace /> },
+    { path: "/wishlist", element: <ProtectedRoute><Navigate to="/account?tab=saved" replace /></ProtectedRoute> },
+    { path: "/saved", element: <ProtectedRoute><Navigate to="/account?tab=saved" replace /></ProtectedRoute> },
     { path: "/contact", element: <Layout><Contact /></Layout> },
-    { path: "/dashboard", element: usr && usr.emailVerified ? <Home /> : <Navigate to="/login" /> }
+    { path: "/dashboard", element: <Home /> }
   ])
 
   return (

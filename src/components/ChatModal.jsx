@@ -1,10 +1,11 @@
 import { useState, useEffect, useRef } from 'react'
 import { auth, db } from '../firebase'
-import { doc, getDoc, onSnapshot, deleteDoc, updateDoc, serverTimestamp } from 'firebase/firestore'
+import { doc, getDoc, onSnapshot, deleteDoc, updateDoc, serverTimestamp, runTransaction } from 'firebase/firestore'
 import { useChat } from '../hooks/useChat'
 import toast from 'react-hot-toast'
 import PaymentModal from './chat/PaymentModal'
 import VerifyOtpModal from './chat/VerifyOtpModal'
+import { releaseExpiredLegacyReservation } from '../utils/reservations'
 
 /**
  * Format Firestore timestamp or Date into human-readable time string.
@@ -74,6 +75,7 @@ export default function ChatModal({
   const [offerInput, setOfferInput] = useState('')
   const [counterpartyName, setCounterpartyName] = useState(initialCounterpartyName || '')
   const [productData, setProductData] = useState(null)
+  const [clockNow, setClockNow] = useState(Date.now())
   const [convData, setConvData] = useState(null)
   const inputRef = useRef(null)
 
@@ -82,7 +84,12 @@ export default function ChatModal({
   const counterpartyId = isSeller ? conversation?.buyerId : conversation?.sellerId
   const counterpartyRole = isSeller ? 'Buyer' : 'Seller'
   const productStatus = productData?.status || 'AVAILABLE'
-  const isReserved = productStatus === 'RESERVED'
+  const otpExpiry = productData?.otpExpiresAt?.toDate?.()?.getTime?.() ??
+    ((productData?.reservedAt?.toDate?.()?.getTime?.() ?? 0) + 5 * 60 * 1000)
+  const isReserved = Boolean(
+    productData?.handshakeOtp && productData?.buyerId && otpExpiry > clockNow &&
+    ['AVAILABLE', 'RESERVED'].includes(productStatus)
+  )
   const isSold = productStatus === 'SOLD'
 
   const {
@@ -114,6 +121,11 @@ export default function ChatModal({
     }
   }, [isOpen, scrollToBottom])
 
+  useEffect(() => {
+    const timer = window.setInterval(() => setClockNow(Date.now()), 1000)
+    return () => window.clearInterval(timer)
+  }, [])
+
   // Track live product state (status, handshakeOtp, buyerId, etc.)
   useEffect(() => {
     if (!conversation?.listingId) return
@@ -123,7 +135,13 @@ export default function ChatModal({
       productRef,
       (docSnap) => {
         if (docSnap.exists()) {
-          setProductData({ id: docSnap.id, ...docSnap.data() })
+          const data = docSnap.data()
+          setProductData({ id: docSnap.id, ...data })
+          if (data.status === 'RESERVED') {
+            releaseExpiredLegacyReservation(docSnap.id).catch((err) => {
+              console.error('Failed to release expired legacy reservation:', err)
+            })
+          }
         }
       },
       (err) => console.error('Failed to subscribe to product updates:', err)
@@ -131,6 +149,23 @@ export default function ChatModal({
 
     return () => unsub()
   }, [conversation?.listingId])
+
+  // A legacy RESERVED listing may have been unexpired when chat opened.
+  // Recheck it at the deadline so its payment button can become available.
+  useEffect(() => {
+    if (productData?.status !== 'RESERVED' || !productData.id) return undefined
+
+    const expiry = productData.otpExpiresAt?.toDate?.()?.getTime?.() ??
+      ((productData.reservedAt?.toDate?.()?.getTime?.() ?? 0) + 5 * 60 * 1000)
+    const delay = Math.max(0, expiry - Date.now() + 1000)
+    const timer = window.setTimeout(() => {
+      releaseExpiredLegacyReservation(productData.id).catch((err) => {
+        console.error('Failed to release expired legacy reservation:', err)
+      })
+    }, delay)
+
+    return () => window.clearTimeout(timer)
+  }, [productData])
 
   // Track live conversation updates (dealPrice, lastMessage, etc.)
   useEffect(() => {
@@ -228,9 +263,21 @@ export default function ChatModal({
 
       // 1. Mark message as ACCEPTED in messages subcollection
       const msgRef = doc(db, 'conversations', conversation.id, 'messages', msg.id)
-      await updateDoc(msgRef, {
-        status: 'ACCEPTED',
-        acceptedAt: serverTimestamp()
+      await runTransaction(db, async (transaction) => {
+        const messageSnapshot = await transaction.get(msgRef)
+        const convRef = doc(db, 'conversations', conversation.id)
+        const conversationSnapshot = await transaction.get(convRef)
+        if (!messageSnapshot.exists() || !conversationSnapshot.exists()) throw new Error('Offer unavailable')
+        if (!messageSnapshot.data().isOffer || messageSnapshot.data().status === 'ACCEPTED' ||
+            messageSnapshot.data().senderId === auth.currentUser?.uid) {
+          throw new Error('This offer cannot be accepted by its sender or has already been accepted.')
+        }
+        transaction.update(msgRef, { status: 'ACCEPTED', acceptedAt: serverTimestamp() })
+        transaction.update(convRef, {
+          dealPrice: acceptedPrice,
+          lastMessage: `Offer accepted: INR ${acceptedPrice.toLocaleString('en-IN')}`,
+          lastUpdated: serverTimestamp()
+        })
       })
 
       // 2. Persist dealPrice to conversation document
@@ -242,13 +289,6 @@ export default function ChatModal({
       })
 
       // 3. Persist dealPrice to product document
-      if (conversation.listingId) {
-        const productRef = doc(db, 'products', conversation.listingId)
-        await updateDoc(productRef, {
-          dealPrice: acceptedPrice
-        }).catch(() => {})
-      }
-
       // 4. Send chat notification
       await sendMessage(
         `🤝 I accepted your offer of ₹${acceptedPrice.toLocaleString(
@@ -393,6 +433,11 @@ export default function ChatModal({
               </div>
               <p className="text-[11px] text-blue-700 dark:text-blue-300 mt-0.5">
                 Share this 4-digit OTP with the seller <u>only after</u> receiving and verifying the item:
+                {productData?.otpExpiresAt?.toDate && (
+                  <span className="block font-semibold">
+                    Expires at {productData.otpExpiresAt.toDate().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                  </span>
+                )}
               </p>
             </div>
             <div className="flex items-center gap-2 self-start sm:self-auto bg-white dark:bg-slate-800 border-2 border-blue-400 dark:border-blue-600 px-3.5 py-1.5 rounded-xl shadow-xs">
@@ -465,7 +510,7 @@ export default function ChatModal({
                   onClick={() => sendMessage('Hi, is this still available?')}
                   className="btn btn-outline btn-xs rounded-full border-gray-300 dark:border-slate-700"
                 >
-                  "Hi, is this still available?"
+                  &quot;Hi, is this still available?&quot;
                 </button>
                 <button
                   type="button"
@@ -670,7 +715,7 @@ export default function ChatModal({
             </button>
 
             {/* Pay via UPI Button (Buyer only, when AVAILABLE) */}
-            {!isSeller && productStatus === 'AVAILABLE' && (
+            {!isSeller && productStatus === 'AVAILABLE' && !isReserved && (
               <button
                 type="button"
                 onClick={() => setShowPaymentModal(true)}
@@ -696,7 +741,7 @@ export default function ChatModal({
               </button>
             )}
 
-            {/* Verify OTP Button (Seller only, when RESERVED) */}
+            {/* Verify OTP Button (Seller only, while the handover OTP is active) */}
             {isSeller && isReserved && (
               <button
                 type="button"
@@ -751,9 +796,6 @@ export default function ChatModal({
           conversation={conversation}
           defaultAmount={currentDealPrice}
           sendMessage={sendMessage}
-          onPaymentInitiated={() => {
-            setShowPaymentModal(false)
-          }}
         />
 
         {/* Handshake Verification Modal (Seller) */}

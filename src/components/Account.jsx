@@ -1,11 +1,12 @@
-import React, { useState, useEffect } from 'react'
+import { useState, useEffect } from 'react'
 import { useSearchParams, useNavigate, Link } from 'react-router-dom'
-import { doc, getDoc, setDoc, updateDoc, serverTimestamp, onSnapshot } from 'firebase/firestore'
+import { doc, getDoc, setDoc, onSnapshot } from 'firebase/firestore'
 import { auth, db } from '../firebase'
 import { useWishlist } from '../hooks/useWishlist'
 import { getOptimizedCloudinaryUrl } from '../utils/productImages'
 import ChatModal from './ChatModal'
 import toast from 'react-hot-toast'
+import { getOrCreateConversation } from '../utils/chatHelpers'
 
 export const UPI_REGEX = /^[\w.-]+@[\w.-]+$/
 
@@ -79,7 +80,9 @@ export default function Account() {
           toast.error('Failed to load profile')
         }
       } else {
-        nav('/login')
+        setU(null)
+        setProf(null)
+        setFrm({ name: '', hostel: '', upiId: '' })
       }
       setProfileLoading(false)
     })
@@ -178,37 +181,12 @@ export default function Account() {
     setStartingChatId(listingId)
 
     try {
-      const chatId = `${listingId}_${currentUserId}`
-      const convRef = doc(db, 'conversations', chatId)
-      const convSnap = await getDoc(convRef)
-
-      let conversationData
-      if (convSnap.exists()) {
-        conversationData = { id: convSnap.id, ...convSnap.data() }
-      } else {
-        const primaryImage =
-          (liveData?.imageUrls && liveData.imageUrls[0]) ||
-          (item.images && item.images[0]) ||
-          ''
-
-        conversationData = {
-          id: chatId,
-          listingId: listingId,
-          listingTitle: liveData?.title || item.title || 'Product',
-          listingPrice: Number(liveData?.price ?? item.price) || 0,
-          listingImage: primaryImage,
-          sellerId: sellerId,
-          buyerId: currentUserId,
-          participants: [sellerId, currentUserId],
-          lastMessage: '',
-          lastUpdated: serverTimestamp(),
-          unreadCount: {
-            [sellerId]: 0,
-            [currentUserId]: 0
-          }
-        }
-        await setDoc(convRef, conversationData, { merge: true })
-      }
+      const conversationData = await getOrCreateConversation({
+        ...item,
+        ...liveData,
+        id: listingId,
+        sellerId
+      }, currentUserId)
 
       setActiveChat(conversationData)
       setIsChatOpen(true)
@@ -530,7 +508,7 @@ export default function Account() {
                   No saved items yet
                 </h3>
                 <p className="text-gray-500 dark:text-gray-400 max-w-md mx-auto mb-6 text-sm leading-relaxed">
-                  Browse campus listings and tap the heart icon on any product to save it here. We'll track price drops for you!
+                  Browse campus listings and tap the heart icon on any product to save it here. We&apos;ll track price drops for you!
                 </p>
                 <Link
                   to="/buy"

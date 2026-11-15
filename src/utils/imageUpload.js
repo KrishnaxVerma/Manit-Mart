@@ -49,29 +49,3 @@ export const uploadMultipleImages = async (files) => {
   return Promise.all(uploadPromises);
 };
 
-/**
- * Delete image from Cloudinary
- * @param {string} publicId - The public ID of the image to delete
- * @returns {Promise<Object>} - Deletion result
- */
-export const deleteImageFromCloudinary = async (publicId) => {
-  try {
-    const response = await fetch(
-      `https://api.cloudinary.com/v1_1/${cloudName}/image/destroy`,
-      {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          public_id: publicId,
-        }),
-      }
-    );
-
-    return await response.json();
-  } catch (error) {
-    console.error('Error deleting image from Cloudinary:', error);
-    throw error;
-  }
-};

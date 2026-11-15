@@ -1,10 +1,9 @@
-import React, { useState, useEffect } from 'react'
+import { useState, useEffect } from 'react'
 import { Link } from 'react-router-dom'
 import { onAuthStateChanged } from 'firebase/auth'
 import { collection, query, where, onSnapshot } from 'firebase/firestore'
 import { auth, db } from '../firebase'
 import { useWishlist } from '../hooks/useWishlist'
-import Login from './Login'
 import Logout from './Logout'
 
 function Navbar() {
@@ -15,7 +14,6 @@ function Navbar() {
   const [unreadCount, setUnreadCount] = useState(0)
   const { wishlistItems } = useWishlist()
   const wishlistCount = wishlistItems?.length || 0
-  const element = document.documentElement
 
   useEffect(() => {
     const unsub = onAuthStateChanged(auth, (u) => setUsr(u))
@@ -55,6 +53,7 @@ function Navbar() {
   }, [usr])
 
   useEffect(() => {
+    const element = document.documentElement
     if (theme === "dark") {
       element.classList.add("dark")
       localStorage.setItem("theme", "dark")

@@ -1,18 +1,19 @@
-import React, { useState, useEffect } from 'react'
+import { useState, useEffect } from 'react'
 import { createPortal } from 'react-dom'
-import { doc, getDoc, updateDoc, serverTimestamp } from 'firebase/firestore'
+import { doc, getDoc, runTransaction, serverTimestamp, Timestamp } from 'firebase/firestore'
 import { QRCodeSVG } from 'qrcode.react'
 import { db, auth } from '../../firebase'
 import toast from 'react-hot-toast'
 
+const OTP_VALIDITY_MS = 5 * 60 * 1000
+
 /**
- * In-chat Payment Modal with dynamic UPI QR code, deep-linking, and OTP reservation.
+ * In-chat Payment Modal with dynamic UPI QR code and a five-minute handover OTP.
  *
  * @param {Object} props
  * @param {boolean} props.isOpen
  * @param {Function} props.onClose
  * @param {Object} props.conversation - The active conversation object
- * @param {Function} props.onPaymentInitiated - Callback after user marks as paid with OTP
  * @param {Function} props.sendMessage - Hook method to send system message to chat
  * @param {number} [props.defaultAmount] - Negotiated or initial price
  */
@@ -20,17 +21,20 @@ export default function PaymentModal({
   isOpen,
   onClose,
   conversation,
-  onPaymentInitiated,
   sendMessage,
   defaultAmount
 }) {
   const [sellerUpi, setSellerUpi] = useState('')
   const [sellerName, setSellerName] = useState('')
   const [loadingSeller, setLoadingSeller] = useState(true)
+  const [sellerError, setSellerError] = useState('')
   const [amount, setAmount] = useState(defaultAmount || conversation?.listingPrice || 0)
   const [generatedOtp, setGeneratedOtp] = useState(null)
   const [processing, setProcessing] = useState(false)
   const [copied, setCopied] = useState(false)
+  const [reservationError, setReservationError] = useState('')
+  const [otpExpiresAt, setOtpExpiresAt] = useState(null)
+  const [otpSecondsLeft, setOtpSecondsLeft] = useState(OTP_VALIDITY_MS / 1000)
 
   const listingId = conversation?.listingId
   const sellerId = conversation?.sellerId
@@ -41,8 +45,21 @@ export default function PaymentModal({
       const activePrice = Number(defaultAmount) || Number(conversation?.listingPrice) || 0
       setAmount(activePrice)
       setGeneratedOtp(null)
+      setOtpExpiresAt(null)
     }
   }, [isOpen, defaultAmount, conversation?.listingPrice])
+
+  useEffect(() => {
+    if (!otpExpiresAt) return undefined
+    const updateCountdown = () => {
+      const secondsLeft = Math.max(0, Math.ceil((otpExpiresAt - Date.now()) / 1000))
+      setOtpSecondsLeft(secondsLeft)
+      if (secondsLeft === 0) setGeneratedOtp(null)
+    }
+    updateCountdown()
+    const timer = window.setInterval(updateCountdown, 1000)
+    return () => window.clearInterval(timer)
+  }, [otpExpiresAt])
 
   // Fetch seller profile to get their UPI ID
   useEffect(() => {
@@ -50,6 +67,8 @@ export default function PaymentModal({
 
     let isMounted = true
     setLoadingSeller(true)
+    setSellerError('')
+    setSellerUpi('')
 
     const fetchSellerData = async () => {
       try {
@@ -61,6 +80,7 @@ export default function PaymentModal({
         }
       } catch (err) {
         console.error('Failed to load seller UPI info:', err)
+        if (isMounted) setSellerError('Could not load seller payment details. Please retry.')
       } finally {
         if (isMounted) setLoadingSeller(false)
       }
@@ -85,41 +105,67 @@ export default function PaymentModal({
   const handleConfirmPaid = async () => {
     if (!listingId || !currentUserId) return
     setProcessing(true)
+    setReservationError('')
 
     try {
-      const otp = Math.floor(1000 + Math.random() * 9000).toString()
+      if (!auth.currentUser?.emailVerified) {
+        throw new Error('Verify your @stu.manit.ac.in email, then sign in again before reserving.')
+      }
+      await auth.currentUser.getIdToken(true)
       const productRef = doc(db, 'products', listingId)
-
-      const buyerName =
-        auth.currentUser.displayName ||
-        auth.currentUser.email?.split('@')[0] ||
-        'Student Buyer'
-
-      // 1. Update listing document to RESERVED with buyerId and handshakeOtp
-      await updateDoc(productRef, {
-        status: 'RESERVED',
-        buyerId: currentUserId,
-        buyerName,
-        handshakeOtp: otp,
-        dealPrice: numericAmount,
-        reservedAt: serverTimestamp()
+      const otp = await runTransaction(db, async (transaction) => {
+        const snapshot = await transaction.get(productRef)
+        if (!snapshot.exists() || snapshot.data().status !== 'AVAILABLE') {
+          throw new Error('This listing is no longer available.')
+        }
+        const product = snapshot.data()
+        const existingExpiry = product.otpExpiresAt?.toMillis?.() ?? 0
+        if (product.handshakeOtp && existingExpiry > Date.now()) {
+          if (product.buyerId !== currentUserId) {
+            throw new Error('Another buyer has an active five-minute handover OTP for this item.')
+          }
+          return { code: product.handshakeOtp, expiresAt: existingExpiry }
+        }
+        const randomValue = new Uint32Array(1)
+        globalThis.crypto.getRandomValues(randomValue)
+        const newOtp = String(1000 + (randomValue[0] % 9000))
+        const expiry = Timestamp.fromMillis(Date.now() + OTP_VALIDITY_MS)
+        transaction.update(productRef, {
+          buyerId: currentUserId,
+          handshakeOtp: newOtp,
+          dealPrice: numericAmount,
+          reservedAt: serverTimestamp(),
+          otpExpiresAt: expiry
+        })
+        return { code: newOtp, expiresAt: expiry.toMillis() }
       })
 
-      // 2. Post automated system announcement in chat
+      // Reservation succeeded, so reveal the OTP even if chat notification fails.
+      setGeneratedOtp(otp.code)
+      setOtpExpiresAt(otp.expiresAt)
+
+      // Post the chat announcement as a separate, non-blocking operation.
       if (sendMessage) {
+        try {
         await sendMessage(
           `🔔 Payment initiated! Deal Price: ₹${numericAmount.toLocaleString(
             'en-IN'
-          )}. Item status is now RESERVED. Handshake OTP generated for secure in-person delivery.`
+          )}. A five-minute handover OTP is active for this buyer.`
         )
+        } catch (messageError) {
+          console.error('Reservation chat announcement failed:', messageError)
+          toast.error('Reservation succeeded, but the chat update failed. Your OTP is shown here.')
+        }
       }
 
-      setGeneratedOtp(otp)
-      toast.success('Item marked as RESERVED! Save your Handshake OTP.', { duration: 4000 })
-      if (onPaymentInitiated) onPaymentInitiated(otp)
+      toast.success('Your five-minute Handshake OTP is active.', { duration: 4000 })
     } catch (err) {
       console.error('Error reserving listing:', err)
-      toast.error('Failed to reserve listing. Please try again.')
+      const message = err.code === 'permission-denied'
+        ? 'Firestore denied OTP creation. Confirm the latest firestore.rules are deployed and your email is verified.'
+        : err.message || 'Could not create a handover OTP. Please try again.'
+      setReservationError(message)
+      toast.error(message)
     } finally {
       setProcessing(false)
     }
@@ -159,10 +205,10 @@ export default function PaymentModal({
               🤝
             </div>
             <h3 className="text-2xl font-black text-gray-900 dark:text-white mb-1">
-              Payment Recorded!
+              OTP Generated
             </h3>
             <p className="text-xs text-gray-500 dark:text-gray-400 mb-6">
-              Listing is now <span className="badge badge-warning badge-sm font-bold">RESERVED</span> for you.
+              The listing stays available. This code is active for you for five minutes.
             </p>
 
             <div className="bg-amber-50 dark:bg-amber-950/40 border-2 border-dashed border-amber-300 dark:border-amber-700/60 rounded-3xl p-6 mb-6">
@@ -172,6 +218,11 @@ export default function PaymentModal({
               <div className="text-4xl font-mono font-black tracking-widest text-amber-900 dark:text-amber-200 my-2 select-all">
                 {generatedOtp}
               </div>
+              <p className="text-xs font-semibold text-amber-800 dark:text-amber-300">
+                {otpSecondsLeft > 0
+                  ? `OTP expires in ${Math.floor(otpSecondsLeft / 60)}:${String(otpSecondsLeft % 60).padStart(2, '0')}`
+                  : 'OTP expired. The listing is available for a new handover.'}
+              </p>
               <p className="text-xs text-amber-800 dark:text-amber-300/90 font-medium leading-relaxed mt-2">
                 ⚠️ <strong>Important:</strong> Meet the seller on campus (Library, Hostel Gate, SAC). Inspect your item, and share this OTP with the seller <em>only after receiving the item</em>.
               </p>
@@ -193,10 +244,10 @@ export default function PaymentModal({
               </div>
               <div>
                 <h3 className="text-lg font-bold text-gray-900 dark:text-white">
-                  Pay Seller via UPI
+                  Self-Reported UPI Payment & Handover Reservation
                 </h3>
                 <p className="text-xs text-gray-500 dark:text-gray-400">
-                  Zero commission & instant campus P2P transfer
+                  Payment note: MANIT Mart cannot verify UPI payment. This OTP confirms the in-person handover only.
                 </p>
               </div>
             </div>
@@ -206,6 +257,8 @@ export default function PaymentModal({
                 <span className="loading loading-spinner loading-md text-blue-600"></span>
                 <p className="text-xs">Fetching seller payment details...</p>
               </div>
+            ) : sellerError ? (
+              <div className="alert alert-error text-sm">{sellerError}</div>
             ) : !sellerUpi ? (
               /* Seller Has No UPI Configured */
               <div className="py-6 text-center">
@@ -216,7 +269,7 @@ export default function PaymentModal({
                   Seller UPI Not Set
                 </h4>
                 <p className="text-xs text-gray-500 dark:text-gray-400 max-w-xs mx-auto mb-4 leading-relaxed">
-                  The seller hasn't configured their UPI ID yet. Ask them in chat to add their UPI ID in their Account Profile so you can scan and pay!
+                  The seller hasn&apos;t configured their UPI ID yet. Ask them in chat to add their UPI ID in their Account Profile so you can scan and pay!
                 </p>
                 <button
                   type="button"
@@ -257,7 +310,7 @@ export default function PaymentModal({
                       min="1"
                       step="1"
                       value={amount}
-                      onChange={(e) => setAmount(Number(e.target.value) || 0)}
+                      readOnly
                       className="input input-sm input-ghost text-2xl font-black text-gray-900 dark:text-white w-full p-0 focus:outline-none"
                     />
                   </div>
@@ -301,6 +354,11 @@ export default function PaymentModal({
                 </div>
 
                 {/* Action Buttons */}
+                {reservationError && (
+                  <div className="alert alert-error text-sm" role="alert">
+                    {reservationError}
+                  </div>
+                )}
                 <div className="space-y-2 pt-1">
                   {/* Direct Mobile UPI Intent */}
                   <a

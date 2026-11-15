@@ -1,4 +1,4 @@
-import React, { useState } from 'react'
+import { useState } from 'react'
 import { doc, setDoc } from 'firebase/firestore'
 import { db, auth } from '../firebase'
 import toast from 'react-hot-toast'

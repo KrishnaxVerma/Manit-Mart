@@ -1,35 +1,34 @@
 import React from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { useState } from 'react'
+import toast from 'react-hot-toast'
 
 function Contact() {
     const navigate = useNavigate()
     const [result, setResult] = React.useState("")
+    const [sending, setSending] = useState(false)
 
     const onSubmit = async (event) => {
         event.preventDefault()
+        if (sending) return
+        setSending(true)
         setResult("Sending....")
-        const formData = new FormData(event.target)
-        const ACCESS_KEY = import.meta.env.VITE_ACCESS_KEY
-        formData.append("access_key", ACCESS_KEY)
-
-        const response = await fetch("https://api.web3forms.com/submit", {
-            method: "POST",
-            body: formData
-        })
-
-        const data = await response.json()
-
-        if (data.success) {
+        try {
+            const formData = new FormData(event.target)
+            const ACCESS_KEY = import.meta.env.VITE_ACCESS_KEY
+            if (!ACCESS_KEY) throw new Error('Contact form is not configured.')
+            formData.append("access_key", ACCESS_KEY)
+            const response = await fetch("https://api.web3forms.com/submit", { method: "POST", body: formData })
+            const data = await response.json()
+            if (!response.ok || !data.success) throw new Error(data.message || 'Unable to submit the form.')
             setResult("Form Submitted Successfully")
             event.target.reset()
-            // Optional: Navigate after successful submission
-            setTimeout(() => {
-                navigate("/")
-            }, 2000)
-        } else {
-            console.log("Error", data)
-            setResult(data.message)
+            setTimeout(() => navigate("/"), 2000)
+        } catch (error) {
+            setResult(error.message || 'Network error. Please try again.')
+            toast.error(error.message || 'Unable to send your message.')
+        } finally {
+            setSending(false)
         }
     }
 
@@ -95,6 +94,7 @@ function Contact() {
                         <div className='mt-8'>
                             <button 
                                 type="submit"
+                                disabled={sending}
                                 className='bg-blue-500 hover:bg-blue-600 text-white rounded-md px-6 py-2 duration-200 font-medium'
                             >
                                 Submit

@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useState, useEffect, useCallback, useMemo } from 'react'
+import { createContext, useContext, useState, useEffect, useCallback, useMemo } from 'react'
 import {
   collection,
   doc,
@@ -37,8 +37,6 @@ export function WishlistProvider({ children }) {
   // Real-time Firestore subscription to users/{userId}/wishlist
   useEffect(() => {
     if (!currentUser) {
-      setWishlistItems([])
-      setWishlistIds(new Set())
       setLoading(false)
       return
     }
@@ -48,6 +46,7 @@ export function WishlistProvider({ children }) {
     // We order by savedAt descending so newly saved items appear at top
     const q = query(wishlistRef, orderBy('savedAt', 'desc'))
 
+    let fallbackUnsub
     const unsubscribe = onSnapshot(
       q,
       (snapshot) => {
@@ -62,7 +61,7 @@ export function WishlistProvider({ children }) {
       (error) => {
         console.error('Error fetching wishlist:', error)
         // Fallback without orderBy in case savedAt index is pending or null
-        const fallbackUnsub = onSnapshot(
+        fallbackUnsub = onSnapshot(
           wishlistRef,
           (fallbackSnap) => {
             const items = fallbackSnap.docs.map((docSnap) => ({
@@ -84,11 +83,13 @@ export function WishlistProvider({ children }) {
             setLoading(false)
           }
         )
-        return () => fallbackUnsub()
       }
     )
 
-    return () => unsubscribe()
+    return () => {
+      unsubscribe()
+      fallbackUnsub?.()
+    }
   }, [currentUser])
 
   // Instant O(1) check
@@ -206,6 +207,7 @@ export function WishlistProvider({ children }) {
   return <WishlistContext.Provider value={value}>{children}</WishlistContext.Provider>
 }
 
+// eslint-disable-next-line react-refresh/only-export-components
 export function useWishlistContext() {
   const context = useContext(WishlistContext)
   if (!context) {
