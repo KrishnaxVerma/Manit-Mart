@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react'
 import { collection, query, where, onSnapshot } from 'firebase/firestore'
+import { onAuthStateChanged } from 'firebase/auth'
 import { db, auth } from '../firebase'
 import { useNavigate } from 'react-router-dom'
 import ChatModal from './ChatModal'
@@ -35,56 +36,70 @@ const formatConversationTime = (timestamp) => {
 export default function Messages() {
   const [conversations, setConversations] = useState([])
   const [loading, setLoading] = useState(true)
+  const [error, setError] = useState(null)
   const [selectedConversation, setSelectedConversation] = useState(null)
   const [filterTab, setFilterTab] = useState('all') // 'all' | 'buying' | 'selling'
+  const [currentUserId, setCurrentUserId] = useState(auth.currentUser?.uid || null)
   const nav = useNavigate()
 
-  const currentUserId = auth.currentUser?.uid
-
   useEffect(() => {
-    if (!auth.currentUser) {
-      setConversations([])
-      setLoading(false)
-      return
-    }
+    let unsubscribeFirestore = null
 
-    setLoading(true)
+    const unsubscribeAuth = onAuthStateChanged(auth, async (user) => {
+      if (!user) {
+        setCurrentUserId(null)
+        setConversations([])
+        setLoading(false)
+        return
+      }
 
-    // Listen to conversations where current user is a participant
-    const convsRef = collection(db, 'conversations')
-    const q = query(convsRef, where('participants', 'array-contains', auth.currentUser.uid))
+      setCurrentUserId(user.uid)
+      setLoading(true)
+      setError(null)
 
-    const unsubscribe = onSnapshot(
-      q,
-      (snapshot) => {
-        const list = snapshot.docs
-          .map((docSnap) => ({
+      try {
+        // Refresh token to guarantee latest claims (like email_verified) are sent to Firestore
+        await user.getIdToken(true)
+      } catch (tokenErr) {
+        console.warn('Could not refresh ID token claims:', tokenErr)
+      }
+
+      // Listen to conversations where current user is a participant
+      const convsRef = collection(db, 'conversations')
+      const q = query(convsRef, where('participants', 'array-contains', user.uid))
+
+      unsubscribeFirestore = onSnapshot(
+        q,
+        (snapshot) => {
+          const list = snapshot.docs.map((docSnap) => ({
             id: docSnap.id,
             ...docSnap.data()
           }))
-          // Only show conversations that have at least one message or offer exchanged
-          .filter((c) => Boolean(c.lastMessage && c.lastMessage.trim() !== ''))
 
-        // Sort in memory by lastUpdated desc (avoids composite index requirement)
-        list.sort((a, b) => {
-          const tA = a.lastUpdated?.toDate ? a.lastUpdated.toDate().getTime() : 0
-          const tB = b.lastUpdated?.toDate ? b.lastUpdated.toDate().getTime() : 0
-          return tB - tA
-        })
+          // Sort in memory by lastUpdated desc (avoids composite index requirement)
+          list.sort((a, b) => {
+            const tA = a.lastUpdated?.toDate ? a.lastUpdated.toDate().getTime() : 0
+            const tB = b.lastUpdated?.toDate ? b.lastUpdated.toDate().getTime() : 0
+            return tB - tA
+          })
 
-        setConversations(list)
-        setLoading(false)
-      },
-      (err) => {
-        console.error('Error fetching conversations:', err)
-        setLoading(false)
-      }
-    )
+          setConversations(list)
+          setError(null)
+          setLoading(false)
+        },
+        (err) => {
+          console.error('Error fetching conversations:', err)
+          setError(err.message || 'Permission denied while fetching conversations.')
+          setLoading(false)
+        }
+      )
+    })
 
     return () => {
-      unsubscribe()
+      if (unsubscribeFirestore) unsubscribeFirestore()
+      unsubscribeAuth()
     }
-  }, [currentUserId, nav])
+  }, [])
 
   const filteredList = conversations.filter((c) => {
     if (filterTab === 'buying') return c.buyerId === currentUserId
@@ -144,6 +159,26 @@ export default function Messages() {
           <div className="flex flex-col items-center justify-center py-20 gap-3 text-gray-400">
             <span className="loading loading-spinner loading-lg text-blue-600"></span>
             <p className="text-sm">Loading conversations...</p>
+          </div>
+        ) : error ? (
+          <div className="bg-red-50 dark:bg-red-950/40 border border-red-200 dark:border-red-900 rounded-2xl p-8 text-center shadow-xs">
+            <div className="w-12 h-12 mx-auto mb-3 rounded-full bg-red-100 dark:bg-red-900/60 flex items-center justify-center text-red-600 dark:text-red-400">
+              <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+              </svg>
+            </div>
+            <h3 className="text-lg font-semibold text-red-800 dark:text-red-200">Unable to Load Conversations</h3>
+            <p className="text-sm text-red-600 dark:text-red-300 max-w-md mx-auto mt-1 mb-4">
+              {error.includes('Missing or insufficient permissions')
+                ? 'Firebase Firestore permissions error: Ensure your account is verified and the latest Firestore security rules are published in Firebase Console.'
+                : error}
+            </p>
+            <button
+              onClick={() => window.location.reload()}
+              className="btn btn-outline btn-sm border-red-300 dark:border-red-800 text-red-700 dark:text-red-300 hover:bg-red-100 dark:hover:bg-red-900/40"
+            >
+              Refresh Page
+            </button>
           </div>
         ) : filteredList.length === 0 ? (
           <div className="bg-white dark:bg-slate-800 rounded-2xl border border-gray-200 dark:border-slate-700 p-12 text-center shadow-xs">

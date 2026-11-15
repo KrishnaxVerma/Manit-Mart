@@ -9,13 +9,6 @@ export async function getOrCreateConversation(product, buyerId = auth.currentUse
     throw new Error('A valid listing and buyer account are required to start a chat.')
   }
 
-  // Firestore rules rely on the email_verified token claim. Refresh it first
-  // because the client can retain an older token after the user verifies email.
-  const token = await user.getIdTokenResult(true)
-  if (!token.claims.email_verified) {
-    throw new Error('Verify your account email, then sign out and back in before starting a chat.')
-  }
-
   const chatId = `${product.id}_${buyerId}`
   const conversationRef = doc(db, 'conversations', chatId)
   const existingConversation = await getDoc(conversationRef)

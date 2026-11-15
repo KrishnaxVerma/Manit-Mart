@@ -5,8 +5,27 @@ import { db } from '../firebase'
 import logo from "../../public/collegelogo.png"
 import { getProductImages } from '../utils/productImages'
 
+const getOrSetRandomStat = (key, min, max) => {
+  try {
+    const saved = sessionStorage.getItem(key)
+    if (saved) {
+      const num = parseInt(saved, 10)
+      if (num >= min && num <= max) return num
+    }
+    const generated = Math.floor(Math.random() * (max - min + 1)) + min
+    sessionStorage.setItem(key, String(generated))
+    return generated
+  } catch {
+    return Math.floor(Math.random() * (max - min + 1)) + min
+  }
+}
+
 export default function Banner() {
-  const [stats, setStats] = useState({ products: 0, sellers: 0, categories: 0 })
+  const [stats, setStats] = useState(() => ({
+    products: getOrSetRandomStat('manit_mart_stat_products', 150, 200),
+    sellers: getOrSetRandomStat('manit_mart_stat_users', 100, 150),
+    categories: 15
+  }))
   const [recent, setRecent] = useState([])
 
   useEffect(() => {
@@ -21,11 +40,11 @@ export default function Banner() {
         })
         .slice(0, 3)
       setRecent(data)
-      setStats({
-        products: activeProducts.length,
-        sellers: new Set(activeProducts.map((product) => product.sellerId).filter(Boolean)).size,
-        categories: new Set(activeProducts.map((product) => product.category).filter(Boolean)).size
-      })
+      const dynamicCategories = new Set(activeProducts.map((product) => product.category).filter(Boolean)).size
+      setStats((prev) => ({
+        ...prev,
+        categories: Math.max(prev.categories, dynamicCategories)
+      }))
     })
     return unsub
   }, [])
@@ -63,7 +82,7 @@ export default function Banner() {
               <div className='text-gray-600 dark:text-gray-300 font-medium'>Students</div>
             </div>
             <div>
-              <div className='text-3xl font-bold text-gray-900 dark:text-white'>{stats.categories}</div>
+              <div className='text-3xl font-bold text-gray-900 dark:text-white'>{stats.categories}+</div>
               <div className='text-gray-600 dark:text-gray-300 font-medium'>Categories</div>
             </div>
           </div>
