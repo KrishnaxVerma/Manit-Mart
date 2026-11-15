@@ -7,14 +7,20 @@ service cloud.firestore {
     }
 
     function isParticipant(data) {
-      return verified() && request.auth.uid in data.participants;
+      return verified() && (
+        (data.get('participants', []) is list &&
+          request.auth.uid in data.get('participants', [])) ||
+        data.get('buyerId', '') == request.auth.uid ||
+        data.get('sellerId', '') == request.auth.uid
+      );
     }
 
     function validConversation(data) {
       return data.keys().hasOnly([
                'id', 'listingId', 'listingTitle', 'listingPrice', 'listingImage',
                'sellerId', 'buyerId', 'participants', 'lastMessage', 'lastUpdated',
-               'unreadCount', 'dealPrice'
+               'unreadCount', 'dealPrice', 'handshakeOtp', 'otpExpiresAt',
+               'otpGeneratedAt', 'otpVerified', 'otpVerifiedAt', 'otpVerificationAttempt'
              ]) &&
              data.keys().hasAll([
                'id', 'listingId', 'listingTitle', 'listingPrice', 'listingImage',
@@ -24,14 +30,21 @@ service cloud.firestore {
              data.listingId is string && data.listingId.size() > 0 &&
              data.listingTitle is string && data.listingTitle.size() <= 200 &&
              data.listingPrice is number && data.listingPrice >= 0 &&
-             data.listingImage is string && data.listingImage.size() <= 2000 &&
+             data.listingImage is string && data.listingImage.size() <= 10000 &&
              data.sellerId is string && data.buyerId is string &&
              data.sellerId != data.buyerId &&
              data.participants is list && data.participants.size() == 2 &&
              data.participants.hasAll([data.sellerId, data.buyerId]) &&
              data.lastMessage is string && data.lastMessage.size() <= 2000 &&
              data.lastUpdated is timestamp && data.unreadCount is map &&
-             (!('dealPrice' in data) || (data.dealPrice is number && data.dealPrice > 0));
+             (!('dealPrice' in data) || (data.dealPrice is number && data.dealPrice > 0)) &&
+             (!('handshakeOtp' in data) || (data.handshakeOtp is string &&
+               data.handshakeOtp.matches('^[0-9]{4}$') && data.otpExpiresAt is timestamp &&
+               data.otpGeneratedAt is timestamp)) &&
+             (!('otpVerified' in data) || data.otpVerified is bool) &&
+             (!('otpVerifiedAt' in data) || data.otpVerifiedAt is timestamp) &&
+             (!('otpVerificationAttempt' in data) || (data.otpVerificationAttempt is string &&
+               data.otpVerificationAttempt.matches('^[0-9]{4}$')));
     }
 
     function validMessage(data) {
@@ -72,12 +85,6 @@ service cloud.firestore {
              ));
     }
 
-    function reservationExpired(data) {
-      return ('otpExpiresAt' in data && data.otpExpiresAt <= request.time) ||
-        (!('otpExpiresAt' in data) &&
-          (!('reservedAt' in data) || data.reservedAt + duration.value(5, 'm') <= request.time));
-    }
-
     match /users/{userId} {
       allow read: if verified();
       allow create, update: if verified() && request.auth.uid == userId &&
@@ -114,67 +121,97 @@ service cloud.firestore {
         request.resource.data.price is number && request.resource.data.price > 0 &&
         request.resource.data.imageUrls is list && request.resource.data.imageUrls.size() > 0 &&
         request.resource.data.imageUrls.size() <= 5;
-      allow update: if verified() && validProduct(request.resource.data) && (
-        (resource.data.sellerId == request.auth.uid && resource.data.status == 'AVAILABLE' &&
+      function completedHandover(buyerId) {
+        let handover = getAfter(
+          /databases/$(database)/documents/conversations/$(productId + '_' + buyerId)
+        ).data;
+        return handover.listingId == productId &&
+          handover.sellerId == resource.data.sellerId &&
+          handover.buyerId == buyerId && handover.otpVerified == true &&
+          handover.otpVerificationAttempt == handover.handshakeOtp;
+      }
+
+      allow update: if verified() && (
+        (validProduct(request.resource.data) &&
+          resource.data.sellerId == request.auth.uid && resource.data.status == 'AVAILABLE' &&
           request.resource.data.sellerId == resource.data.sellerId &&
           request.resource.data.status == 'AVAILABLE' &&
-          (!('otpExpiresAt' in resource.data) || resource.data.otpExpiresAt <= request.time) &&
           request.resource.data.diff(resource.data).affectedKeys().hasOnly([
             'title', 'category', 'price', 'condition', 'description', 'imageUrls', 'sellerName',
             'sellerEmail', 'updatedAt'
           ])) ||
-        (resource.data.status == 'AVAILABLE' && request.resource.data.status == 'AVAILABLE' &&
-          request.resource.data.buyerId == request.auth.uid &&
-          request.auth.uid != resource.data.sellerId &&
-          (!('otpExpiresAt' in resource.data) || resource.data.otpExpiresAt <= request.time ||
-            resource.data.buyerId == request.auth.uid) &&
-          request.resource.data.diff(resource.data).affectedKeys().hasOnly([
-            'buyerId', 'dealPrice', 'handshakeOtp', 'reservedAt', 'otpExpiresAt'
-          ]) && request.resource.data.dealPrice is number && request.resource.data.dealPrice > 0 &&
-          request.resource.data.handshakeOtp is string && request.resource.data.handshakeOtp.matches('^[0-9]{4}$') &&
-          request.resource.data.reservedAt is timestamp && request.resource.data.otpExpiresAt is timestamp &&
-          request.resource.data.otpExpiresAt > request.time &&
-          request.resource.data.otpExpiresAt <= request.time + duration.value(5, 'm') + duration.value(5, 's')) ||
-        (resource.data.status == 'RESERVED' && reservationExpired(resource.data) &&
-          request.resource.data.status == 'AVAILABLE' &&
+        (resource.data.status == 'RESERVED' && request.resource.data.status == 'AVAILABLE' &&
           request.resource.data.diff(resource.data).affectedKeys().hasOnly([
             'status', 'buyerId', 'dealPrice', 'handshakeOtp', 'reservedAt', 'otpExpiresAt'
           ]) && !('buyerId' in request.resource.data) && !('dealPrice' in request.resource.data) &&
           !('handshakeOtp' in request.resource.data) && !('reservedAt' in request.resource.data) &&
           !('otpExpiresAt' in request.resource.data)) ||
         (resource.data.sellerId == request.auth.uid &&
-          resource.data.status in ['AVAILABLE', 'RESERVED'] &&
-          request.resource.data.status == 'SOLD' &&
-          resource.data.buyerId is string && resource.data.handshakeOtp is string &&
-          resource.data.otpExpiresAt is timestamp && resource.data.otpExpiresAt > request.time &&
-          request.resource.data.handshakeOtp == resource.data.handshakeOtp &&
-          request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status', 'completedAt']) &&
-          request.resource.data.completedAt is timestamp)
+          resource.data.get('status', 'AVAILABLE') == 'AVAILABLE' &&
+          request.resource.data.status == 'SOLD' && request.resource.data.buyerId is string &&
+          request.resource.data.diff(resource.data).affectedKeys().hasOnly([
+            'status', 'completedAt', 'buyerId'
+          ]) && request.resource.data.completedAt is timestamp &&
+          completedHandover(request.resource.data.buyerId))
       );
       allow delete: if verified() && resource.data.sellerId == request.auth.uid &&
-        resource.data.status == 'AVAILABLE' &&
-        (!('otpExpiresAt' in resource.data) || resource.data.otpExpiresAt <= request.time);
+        resource.data.status == 'AVAILABLE';
     }
 
     match /conversations/{chatId} {
-      allow read: if isParticipant(resource.data);
+      // Chat creation uses a transaction that first reads the deterministic
+      // conversation path. Allow verified users to check an absent path; once
+      // the document exists, only its participants can read it.
+      allow get: if verified() && (
+        !exists(/databases/$(database)/documents/conversations/$(chatId)) ||
+        isParticipant(resource.data)
+      );
+      allow list: if isParticipant(resource.data);
       allow create: if verified() && validConversation(request.resource.data) &&
         request.resource.data.buyerId == request.auth.uid &&
         exists(/databases/$(database)/documents/products/$(request.resource.data.listingId)) &&
         get(/databases/$(database)/documents/products/$(request.resource.data.listingId)).data.sellerId == request.resource.data.sellerId &&
-        get(/databases/$(database)/documents/products/$(request.resource.data.listingId)).data.status == 'AVAILABLE';
+        get(/databases/$(database)/documents/products/$(request.resource.data.listingId)).data.get('status', 'AVAILABLE') == 'AVAILABLE';
       allow update: if isParticipant(resource.data) && validConversation(request.resource.data) &&
         request.resource.data.id == resource.data.id &&
         request.resource.data.listingId == resource.data.listingId &&
         request.resource.data.sellerId == resource.data.sellerId &&
         request.resource.data.buyerId == resource.data.buyerId &&
-        request.resource.data.participants == resource.data.participants;
+        request.resource.data.participants == resource.data.participants && (
+          (request.resource.data.diff(resource.data).affectedKeys().hasOnly([
+            'lastMessage', 'lastUpdated', 'unreadCount', 'dealPrice'
+          ])) ||
+          (request.auth.uid == resource.data.buyerId &&
+            request.resource.data.diff(resource.data).affectedKeys().hasOnly([
+              'handshakeOtp', 'otpExpiresAt', 'otpGeneratedAt', 'dealPrice',
+              'otpVerified', 'otpVerifiedAt', 'otpVerificationAttempt'
+            ]) &&
+            request.resource.data.handshakeOtp is string &&
+            request.resource.data.handshakeOtp.matches('^[0-9]{4}$') &&
+            request.resource.data.otpExpiresAt is timestamp &&
+            request.resource.data.otpExpiresAt > request.time &&
+            request.resource.data.otpExpiresAt <= request.time + duration.value(5, 'm') + duration.value(5, 's') &&
+            request.resource.data.otpGeneratedAt is timestamp &&
+            request.resource.data.otpVerified == false &&
+            (!('dealPrice' in request.resource.data) || request.resource.data.dealPrice > 0) &&
+            exists(/databases/$(database)/documents/products/$(resource.data.listingId)) &&
+            get(/databases/$(database)/documents/products/$(resource.data.listingId)).data.get('status', 'AVAILABLE') == 'AVAILABLE') ||
+          (request.auth.uid == resource.data.sellerId &&
+            request.resource.data.diff(resource.data).affectedKeys().hasOnly([
+              'otpVerified', 'otpVerifiedAt', 'otpVerificationAttempt'
+            ]) && request.resource.data.otpVerified == true &&
+            request.resource.data.otpVerificationAttempt == resource.data.handshakeOtp &&
+            request.resource.data.otpVerifiedAt is timestamp &&
+            resource.data.otpExpiresAt is timestamp && resource.data.otpExpiresAt > request.time &&
+            exists(/databases/$(database)/documents/products/$(resource.data.listingId)) &&
+            get(/databases/$(database)/documents/products/$(resource.data.listingId)).data.get('status', 'AVAILABLE') == 'AVAILABLE')
+        );
       allow delete: if isParticipant(resource.data) && resource.data.lastMessage == '';
 
       match /messages/{messageId} {
         function parentParticipant() {
           return verified() && exists(/databases/$(database)/documents/conversations/$(chatId)) &&
-            request.auth.uid in get(/databases/$(database)/documents/conversations/$(chatId)).data.participants;
+            isParticipant(get(/databases/$(database)/documents/conversations/$(chatId)).data);
         }
         allow read: if parentParticipant();
         allow create: if parentParticipant() && validMessage(request.resource.data);

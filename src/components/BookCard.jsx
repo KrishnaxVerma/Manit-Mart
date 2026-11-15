@@ -7,7 +7,7 @@ import WishlistButton from './WishlistButton'
 import toast from 'react-hot-toast'
 import { getOrCreateConversation } from '../utils/chatHelpers'
 
-export default function ProductCard({ product }) {
+export default function ProductCard({ product, onListingUnavailable }) {
   const [currentImg, setCurrentImg] = useState(0)
   const [showAllImages, setShowAllImages] = useState(false)
   const [ownerName, setOwnerName] = useState(product.sellerName || 'Unknown seller')
@@ -87,7 +87,8 @@ export default function ProductCard({ product }) {
       setIsChatOpen(true)
     } catch (err) {
       console.error('Failed to initiate conversation:', err)
-      toast.error('Unable to open chat right now. Please try again.')
+      if (err.code === 'listing-unavailable') onListingUnavailable?.(product.id)
+      toast.error(err.message || 'Unable to open chat right now. Please try again.')
     } finally {
       setStartingChat(false)
     }

@@ -239,7 +239,7 @@ In the project directory, you can run:
 
 - **Domain Restriction**: Only emails ending in `@stu.manit.ac.in` can create accounts, preventing unauthorized external access.
 - **Verification Gate**: Users must verify their email address before accessing product listings, publishing items, or sending messages.
-- **Handshake Expiry**: Handover OTPs are valid for five minutes. Listings remain available while an OTP is active, and expired codes can be replaced by a new buyer.
+- **Handshake Expiry**: Each buyer chat has its own five-minute handover OTP. OTPs do not reserve or hide the listing, and buyers can generate a fresh code in their chat.
 - **Cloudinary Safe Uploads**: Client uploads are validated for file size (max 5 MB) and MIME types before dispatching to Cloudinary.
 - **Firestore Rules**: Granular Firestore security rules (`firestore.rules`) govern access controls to products, users, conversations, and transaction records.
 

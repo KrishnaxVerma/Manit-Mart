@@ -5,7 +5,7 @@ import { useChat } from '../hooks/useChat'
 import toast from 'react-hot-toast'
 import PaymentModal from './chat/PaymentModal'
 import VerifyOtpModal from './chat/VerifyOtpModal'
-import { releaseExpiredLegacyReservation } from '../utils/reservations'
+import { clearLegacyReservation } from '../utils/reservations'
 
 /**
  * Format Firestore timestamp or Date into human-readable time string.
@@ -43,6 +43,17 @@ const formatMessageTime = (timestamp) => {
 
   const dateStr = date.toLocaleDateString([], { month: 'short', day: 'numeric' })
   return `${dateStr}, ${timeStr}`
+}
+
+const timestampMillis = (value) => {
+  if (!value) return 0
+  if (typeof value.toMillis === 'function') return value.toMillis()
+  if (typeof value.toDate === 'function') return value.toDate().getTime()
+  if (value instanceof Date) return value.getTime()
+  if (typeof value === 'number') return value
+  if (typeof value.seconds === 'number') return value.seconds * 1000
+  const parsed = Date.parse(value)
+  return Number.isFinite(parsed) ? parsed : 0
 }
 
 /**
@@ -84,12 +95,9 @@ export default function ChatModal({
   const counterpartyId = isSeller ? conversation?.buyerId : conversation?.sellerId
   const counterpartyRole = isSeller ? 'Buyer' : 'Seller'
   const productStatus = productData?.status || 'AVAILABLE'
-  const otpExpiry = productData?.otpExpiresAt?.toDate?.()?.getTime?.() ??
-    ((productData?.reservedAt?.toDate?.()?.getTime?.() ?? 0) + 5 * 60 * 1000)
-  const isReserved = Boolean(
-    productData?.handshakeOtp && productData?.buyerId && otpExpiry > clockNow &&
-    ['AVAILABLE', 'RESERVED'].includes(productStatus)
-  )
+  const otpExpiry = timestampMillis(convData?.otpExpiresAt)
+  const hasActiveOtp = Boolean(convData?.handshakeOtp && otpExpiry > clockNow)
+  const canOpenPayment = !isSeller && productStatus === 'AVAILABLE'
   const isSold = productStatus === 'SOLD'
 
   const {
@@ -126,7 +134,7 @@ export default function ChatModal({
     return () => window.clearInterval(timer)
   }, [])
 
-  // Track live product state (status, handshakeOtp, buyerId, etc.)
+  // Track live listing status and clear holds left by older app versions.
   useEffect(() => {
     if (!conversation?.listingId) return
 
@@ -138,8 +146,8 @@ export default function ChatModal({
           const data = docSnap.data()
           setProductData({ id: docSnap.id, ...data })
           if (data.status === 'RESERVED') {
-            releaseExpiredLegacyReservation(docSnap.id).catch((err) => {
-              console.error('Failed to release expired legacy reservation:', err)
+            clearLegacyReservation(docSnap.id).catch((err) => {
+              console.error('Failed to clear legacy listing hold:', err)
             })
           }
         }
@@ -149,23 +157,6 @@ export default function ChatModal({
 
     return () => unsub()
   }, [conversation?.listingId])
-
-  // A legacy RESERVED listing may have been unexpired when chat opened.
-  // Recheck it at the deadline so its payment button can become available.
-  useEffect(() => {
-    if (productData?.status !== 'RESERVED' || !productData.id) return undefined
-
-    const expiry = productData.otpExpiresAt?.toDate?.()?.getTime?.() ??
-      ((productData.reservedAt?.toDate?.()?.getTime?.() ?? 0) + 5 * 60 * 1000)
-    const delay = Math.max(0, expiry - Date.now() + 1000)
-    const timer = window.setTimeout(() => {
-      releaseExpiredLegacyReservation(productData.id).catch((err) => {
-        console.error('Failed to release expired legacy reservation:', err)
-      })
-    }, delay)
-
-    return () => window.clearTimeout(timer)
-  }, [productData])
 
   // Track live conversation updates (dealPrice, lastMessage, etc.)
   useEffect(() => {
@@ -231,6 +222,10 @@ export default function ChatModal({
     } finally {
       setSending(false)
     }
+  }
+
+  const handleOpenPayment = async () => {
+    setShowPaymentModal(true)
   }
 
   // Handle offer submission
@@ -424,18 +419,18 @@ export default function ChatModal({
           </div>
         )}
 
-        {isReserved && !isSeller && productData?.buyerId === currentUserId && (
+        {hasActiveOtp && !isSeller && (
           <div className="bg-blue-50 dark:bg-blue-950/40 border-b border-blue-200 dark:border-blue-800/60 p-3 sm:px-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-blue-900 dark:text-blue-100 shrink-0 animate-in fade-in">
             <div>
               <div className="flex items-center gap-2 font-bold text-xs">
-                <span className="badge badge-primary badge-xs uppercase tracking-wide">Reserved For You</span>
-                <span>Payment & Handshake in Progress</span>
+                <span className="badge badge-primary badge-xs uppercase tracking-wide">Handshake OTP</span>
+                <span>Ready for item handover</span>
               </div>
               <p className="text-[11px] text-blue-700 dark:text-blue-300 mt-0.5">
                 Share this 4-digit OTP with the seller <u>only after</u> receiving and verifying the item:
-                {productData?.otpExpiresAt?.toDate && (
+                {convData?.otpExpiresAt?.toDate && (
                   <span className="block font-semibold">
-                    Expires at {productData.otpExpiresAt.toDate().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                    Expires at {convData.otpExpiresAt.toDate().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
                   </span>
                 )}
               </p>
@@ -443,18 +438,18 @@ export default function ChatModal({
             <div className="flex items-center gap-2 self-start sm:self-auto bg-white dark:bg-slate-800 border-2 border-blue-400 dark:border-blue-600 px-3.5 py-1.5 rounded-xl shadow-xs">
               <span className="text-xs text-gray-500 dark:text-gray-400 font-semibold uppercase">OTP:</span>
               <span className="text-lg font-extrabold tracking-widest font-mono text-blue-600 dark:text-blue-400">
-                {productData?.handshakeOtp || '••••'}
+                {convData?.handshakeOtp || '••••'}
               </span>
             </div>
           </div>
         )}
 
-        {isReserved && isSeller && productData?.buyerId === counterpartyId && (
+        {hasActiveOtp && isSeller && convData?.buyerId === counterpartyId && (
           <div className="bg-amber-50 dark:bg-amber-950/40 border-b border-amber-200 dark:border-amber-800/60 p-3 sm:px-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-amber-900 dark:text-amber-100 shrink-0 animate-in fade-in">
             <div>
               <div className="flex items-center gap-2 font-bold text-xs">
                 <span className="badge badge-warning badge-xs uppercase tracking-wide">Action Required</span>
-                <span>Buyer Initiated Payment</span>
+                <span>Buyer ready for handover</span>
               </div>
               <p className="text-[11px] text-amber-700 dark:text-amber-300 mt-0.5">
                 Handover the item to the buyer, ask for their 4-digit OTP, and confirm completion.
@@ -715,10 +710,10 @@ export default function ChatModal({
             </button>
 
             {/* Pay via UPI Button (Buyer only, when AVAILABLE) */}
-            {!isSeller && productStatus === 'AVAILABLE' && !isReserved && (
+            {canOpenPayment && (
               <button
                 type="button"
-                onClick={() => setShowPaymentModal(true)}
+                onClick={handleOpenPayment}
                 className="btn btn-sm btn-success text-white shrink-0 gap-1.5 shadow-xs transition"
                 title="Pay via dynamic UPI QR code"
               >
@@ -742,7 +737,7 @@ export default function ChatModal({
             )}
 
             {/* Verify OTP Button (Seller only, while the handover OTP is active) */}
-            {isSeller && isReserved && (
+            {isSeller && hasActiveOtp && convData?.buyerId === counterpartyId && (
               <button
                 type="button"
                 onClick={() => setShowVerifyModal(true)}
@@ -803,6 +798,8 @@ export default function ChatModal({
           isOpen={showVerifyModal}
           onClose={() => setShowVerifyModal(false)}
           listingId={conversation.listingId}
+          conversationId={conversation.id}
+          buyerId={conversation.buyerId}
           listingTitle={conversation.listingTitle}
           sendMessage={sendMessage}
           onVerified={() => {

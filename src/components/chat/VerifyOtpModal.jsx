@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { createPortal } from 'react-dom'
-import { doc, runTransaction, serverTimestamp, deleteField } from 'firebase/firestore'
+import { doc, runTransaction, serverTimestamp } from 'firebase/firestore'
 import { db } from '../../firebase'
 import toast from 'react-hot-toast'
 
@@ -19,6 +19,8 @@ export default function VerifyOtpModal({
   isOpen,
   onClose,
   listingId,
+  conversationId,
+  buyerId,
   listingTitle = 'Product',
   onVerified,
   sendMessage
@@ -27,7 +29,7 @@ export default function VerifyOtpModal({
   const [submitting, setSubmitting] = useState(false)
   const [errorMsg, setErrorMsg] = useState('')
 
-  if (!isOpen || !listingId) return null
+  if (!isOpen || !listingId || !conversationId || !buyerId) return null
 
   const handleVerify = async (e) => {
     e?.preventDefault()
@@ -43,48 +45,46 @@ export default function VerifyOtpModal({
 
     try {
       const productRef = doc(db, 'products', listingId)
+      const conversationRef = doc(db, 'conversations', conversationId)
 
       // Execute Firestore atomic runTransaction
       const verified = await runTransaction(db, async (transaction) => {
+        const conversationSnap = await transaction.get(conversationRef)
         const productSnap = await transaction.get(productRef)
-        if (!productSnap.exists()) {
+        if (!conversationSnap.exists() || !productSnap.exists()) {
           throw new Error('Listing document no longer exists.')
         }
 
-        const data = productSnap.data()
+        const chat = conversationSnap.data()
+        const product = productSnap.data()
 
-        if (!['AVAILABLE', 'RESERVED'].includes(data.status) || !data.buyerId || !data.handshakeOtp) {
-          throw new Error(`There is no active buyer handover for this listing.`)
+        if ((product.status || 'AVAILABLE') !== 'AVAILABLE' || chat.buyerId !== buyerId || !chat.handshakeOtp) {
+          throw new Error('There is no active handover OTP in this buyer chat.')
         }
 
-        if (!data.otpExpiresAt || data.otpExpiresAt.toMillis() <= Date.now()) {
-          if (data.status === 'RESERVED') {
-            transaction.update(productRef, {
-              status: 'AVAILABLE',
-              buyerId: deleteField(),
-              dealPrice: deleteField(),
-              handshakeOtp: deleteField(),
-              reservedAt: deleteField(),
-              otpExpiresAt: deleteField()
-            })
-          }
+        if (!chat.otpExpiresAt || chat.otpExpiresAt.toMillis() <= Date.now()) {
           return false
         }
 
-        if (String(data.handshakeOtp).trim() !== sanitizedOtp) {
+        if (String(chat.handshakeOtp).trim() !== sanitizedOtp) {
           throw new Error('Incorrect OTP. Please verify the 4-digit code shown on the buyer’s phone.')
         }
 
-        // Keep the OTP fields unchanged so the Firestore completion rule can validate them.
+        transaction.update(conversationRef, {
+          otpVerified: true,
+          otpVerifiedAt: serverTimestamp(),
+          otpVerificationAttempt: sanitizedOtp
+        })
         transaction.update(productRef, {
           status: 'SOLD',
+          buyerId,
           completedAt: serverTimestamp()
         })
         return true
       })
 
       if (!verified) {
-        setErrorMsg('This OTP expired. The listing is available for a new handover.')
+        setErrorMsg('This OTP expired. Generate a new OTP in this chat.')
         return
       }
 

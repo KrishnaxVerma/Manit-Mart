@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef } from 'react'
 import { collection, addDoc, query, where, onSnapshot, deleteDoc, doc, getDoc, updateDoc } from 'firebase/firestore'
 import { db, auth } from '../firebase'
+import { clearLegacyReservation } from '../utils/reservations'
 import { useNavigate } from 'react-router-dom'
 import toast from 'react-hot-toast'
 import ProductCard from './BookCard'
@@ -31,7 +32,6 @@ export default function Sell() {
   const [sellerUpi, setSellerUpi] = useState(null)
   const [checkingUpi, setCheckingUpi] = useState(true)
   const [showUpiModal, setShowUpiModal] = useState(false)
-  const [clockNow, setClockNow] = useState(Date.now())
   const nav = useNavigate()
 
   const categories = ['Books', 'Electronics', 'Accessories', 'Stationary', 'Others']
@@ -64,18 +64,14 @@ export default function Sell() {
     const unsub = onSnapshot(q, (snap) => {
       const data = snap.docs.map(doc => ({ id: doc.id, ...doc.data() }))
       setProducts(data)
+      data.filter((product) => product.status === 'RESERVED').forEach((product) => {
+        clearLegacyReservation(product.id).catch((err) => {
+          console.error('Failed to clear legacy listing hold:', err)
+        })
+      })
     })
     return unsub
   }, [nav])
-
-  useEffect(() => {
-    const timer = window.setInterval(() => setClockNow(Date.now()), 1000)
-    return () => window.clearInterval(timer)
-  }, [])
-
-  const hasActiveHandshake = (product) => Boolean(
-    product.handshakeOtp && product.otpExpiresAt?.toDate?.().getTime() > clockNow
-  )
 
   const handleImageSelection = (files) => {
     if (!files || files.length === 0) return
@@ -467,14 +463,14 @@ export default function Sell() {
                   <div className="absolute top-4 right-4 flex gap-2">
                     <button
                       onClick={() => startEdit(product)}
-                      disabled={product.status === 'RESERVED' || product.status === 'SOLD' || hasActiveHandshake(product)}
+                      disabled={product.status === 'SOLD'}
                       className="bg-blue-500 text-white px-2 py-1 rounded text-sm hover:bg-blue-600"
                     >
                       Edit
                     </button>
                     <button
                       onClick={() => del(product.id)}
-                      disabled={product.status === 'RESERVED' || product.status === 'SOLD' || hasActiveHandshake(product)}
+                      disabled={product.status === 'SOLD'}
                       className="bg-red-500 text-white px-2 py-1 rounded text-sm hover:bg-red-600"
                     >
                       Remove

@@ -10,7 +10,7 @@ import {
 import { db } from '../firebase'
 import { useNavigate } from 'react-router-dom'
 import ProductCard from './BookCard'
-import { releaseExpiredLegacyReservation } from '../utils/reservations'
+import { clearLegacyReservation } from '../utils/reservations'
 
 const PAGE_SIZE = 20
 const FILTER_RESULTS_BATCH_SIZE = 5
@@ -92,7 +92,7 @@ export default function Buy() {
   }
 
   const matchesFilters = (product, filters) => {
-    // Exclude sold items and legacy reservations until their five-minute hold expires.
+    // Exclude sold items. Legacy reservations are cleared while listings load.
     if (product.status && product.status !== 'AVAILABLE') {
       return false
     }
@@ -187,7 +187,7 @@ export default function Buy() {
           const product = { id: productDoc.id, ...productDoc.data() }
           if (product.status === 'RESERVED') {
             try {
-              if (await releaseExpiredLegacyReservation(product.id)) {
+              if (await clearLegacyReservation(product.id)) {
                 product.status = 'AVAILABLE'
                 delete product.buyerId
                 delete product.dealPrice
@@ -196,7 +196,7 @@ export default function Buy() {
                 delete product.otpExpiresAt
               }
             } catch (error) {
-              console.error('Could not check an expired reservation:', error)
+              console.error('Could not clear a legacy listing hold:', error)
             }
           }
           return product
@@ -452,6 +452,16 @@ export default function Buy() {
               <ProductCard 
                 key={product.id} 
                 product={product}
+                onListingUnavailable={() => {
+                  requestIdRef.current += 1
+                  fetchProducts({
+                    reset: true,
+                    filters: activeFilters,
+                    targetMatchCount: hasResultLimitingFilters(activeFilters)
+                      ? FILTER_RESULTS_BATCH_SIZE
+                      : 0
+                  })
+                }}
               />
             ))}
           </div>

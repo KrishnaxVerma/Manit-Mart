@@ -525,8 +525,9 @@ export default function Account() {
                   const addedPrice = Number(item.addedPrice ?? currentPrice)
                   const priceDrop = addedPrice > currentPrice ? addedPrice - currentPrice : 0
 
-                  const rawStatus = (liveData?.status || item.status || 'AVAILABLE').toUpperCase()
-                  const isUnavailable = rawStatus === 'SOLD' || rawStatus === 'RESERVED' || rawStatus === 'DELETED'
+                  const storedStatus = (liveData?.status || item.status || 'AVAILABLE').toUpperCase()
+                  const rawStatus = storedStatus === 'RESERVED' ? 'AVAILABLE' : storedStatus
+                  const isUnavailable = rawStatus === 'SOLD' || rawStatus === 'DELETED'
                   const isDeleted = rawStatus === 'DELETED'
 
                   const primaryImage =
@@ -580,14 +581,6 @@ export default function Account() {
                           <div className="absolute inset-0 bg-black/60 backdrop-blur-xs flex items-center justify-center">
                             <span className="badge badge-error badge-lg font-bold text-white uppercase tracking-wider py-3 px-4 shadow-lg">
                               Sold Out
-                            </span>
-                          </div>
-                        )}
-
-                        {rawStatus === 'RESERVED' && (
-                          <div className="absolute inset-0 bg-black/40 backdrop-blur-xs flex items-center justify-center">
-                            <span className="badge badge-warning badge-lg font-bold text-gray-900 uppercase tracking-wider py-3 px-4 shadow-lg">
-                              Reserved
                             </span>
                           </div>
                         )}

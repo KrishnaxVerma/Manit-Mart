@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
 import { createPortal } from 'react-dom'
-import { doc, getDoc, runTransaction, serverTimestamp, Timestamp } from 'firebase/firestore'
+import { deleteField, doc, getDoc, runTransaction, serverTimestamp, Timestamp } from 'firebase/firestore'
 import { QRCodeSVG } from 'qrcode.react'
 import { db, auth } from '../../firebase'
 import toast from 'react-hot-toast'
@@ -22,7 +22,8 @@ export default function PaymentModal({
   onClose,
   conversation,
   sendMessage,
-  defaultAmount
+  defaultAmount,
+  canRegenerateOtp = false
 }) {
   const [sellerUpi, setSellerUpi] = useState('')
   const [sellerName, setSellerName] = useState('')
@@ -32,7 +33,7 @@ export default function PaymentModal({
   const [generatedOtp, setGeneratedOtp] = useState(null)
   const [processing, setProcessing] = useState(false)
   const [copied, setCopied] = useState(false)
-  const [reservationError, setReservationError] = useState('')
+  const [paymentError, setPaymentError] = useState('')
   const [otpExpiresAt, setOtpExpiresAt] = useState(null)
   const [otpSecondsLeft, setOtpSecondsLeft] = useState(OTP_VALIDITY_MS / 1000)
 
@@ -105,42 +106,45 @@ export default function PaymentModal({
   const handleConfirmPaid = async () => {
     if (!listingId || !currentUserId) return
     setProcessing(true)
-    setReservationError('')
+    setPaymentError('')
 
     try {
       if (!auth.currentUser?.emailVerified) {
-        throw new Error('Verify your @stu.manit.ac.in email, then sign in again before reserving.')
+        throw new Error('Verify your @stu.manit.ac.in email, then sign in again before generating an OTP.')
       }
       await auth.currentUser.getIdToken(true)
       const productRef = doc(db, 'products', listingId)
+      const conversationRef = doc(db, 'conversations', conversation.id)
       const otp = await runTransaction(db, async (transaction) => {
         const snapshot = await transaction.get(productRef)
-        if (!snapshot.exists() || snapshot.data().status !== 'AVAILABLE') {
+        const conversationSnapshot = await transaction.get(conversationRef)
+        if (!snapshot.exists() || (snapshot.data().status || 'AVAILABLE') !== 'AVAILABLE') {
           throw new Error('This listing is no longer available.')
         }
-        const product = snapshot.data()
-        const existingExpiry = product.otpExpiresAt?.toMillis?.() ?? 0
-        if (product.handshakeOtp && existingExpiry > Date.now()) {
-          if (product.buyerId !== currentUserId) {
-            throw new Error('Another buyer has an active five-minute handover OTP for this item.')
-          }
-          return { code: product.handshakeOtp, expiresAt: existingExpiry }
+        if (!conversationSnapshot.exists() || conversationSnapshot.data().buyerId !== currentUserId) {
+          throw new Error('Could not find your buyer chat for this listing.')
         }
-        const randomValue = new Uint32Array(1)
-        globalThis.crypto.getRandomValues(randomValue)
-        const newOtp = String(1000 + (randomValue[0] % 9000))
+        const chat = conversationSnapshot.data()
+        let newOtp
+        do {
+          const randomValue = new Uint32Array(1)
+          globalThis.crypto.getRandomValues(randomValue)
+          newOtp = String(1000 + (randomValue[0] % 9000))
+        } while (newOtp === chat.handshakeOtp)
         const expiry = Timestamp.fromMillis(Date.now() + OTP_VALIDITY_MS)
-        transaction.update(productRef, {
-          buyerId: currentUserId,
+        transaction.update(conversationRef, {
           handshakeOtp: newOtp,
           dealPrice: numericAmount,
-          reservedAt: serverTimestamp(),
-          otpExpiresAt: expiry
+          otpExpiresAt: expiry,
+          otpVerified: false,
+          otpVerifiedAt: deleteField(),
+          otpVerificationAttempt: deleteField(),
+          otpGeneratedAt: serverTimestamp()
         })
         return { code: newOtp, expiresAt: expiry.toMillis() }
       })
 
-      // Reservation succeeded, so reveal the OTP even if chat notification fails.
+      // Reveal the OTP even if the chat notification fails.
       setGeneratedOtp(otp.code)
       setOtpExpiresAt(otp.expiresAt)
 
@@ -153,18 +157,18 @@ export default function PaymentModal({
           )}. A five-minute handover OTP is active for this buyer.`
         )
         } catch (messageError) {
-          console.error('Reservation chat announcement failed:', messageError)
-          toast.error('Reservation succeeded, but the chat update failed. Your OTP is shown here.')
+          console.error('OTP chat announcement failed:', messageError)
+          toast.error('OTP created, but the chat update failed. Your OTP is shown here.')
         }
       }
 
       toast.success('Your five-minute Handshake OTP is active.', { duration: 4000 })
     } catch (err) {
-      console.error('Error reserving listing:', err)
+      console.error('Error generating handshake OTP:', err)
       const message = err.code === 'permission-denied'
         ? 'Firestore denied OTP creation. Confirm the latest firestore.rules are deployed and your email is verified.'
         : err.message || 'Could not create a handover OTP. Please try again.'
-      setReservationError(message)
+      setPaymentError(message)
       toast.error(message)
     } finally {
       setProcessing(false)
@@ -244,7 +248,7 @@ export default function PaymentModal({
               </div>
               <div>
                 <h3 className="text-lg font-bold text-gray-900 dark:text-white">
-                  Self-Reported UPI Payment & Handover Reservation
+                  Self-Reported UPI Payment & Handshake Verification
                 </h3>
                 <p className="text-xs text-gray-500 dark:text-gray-400">
                   Payment note: MANIT Mart cannot verify UPI payment. This OTP confirms the in-person handover only.
@@ -354,9 +358,9 @@ export default function PaymentModal({
                 </div>
 
                 {/* Action Buttons */}
-                {reservationError && (
+                {paymentError && (
                   <div className="alert alert-error text-sm" role="alert">
-                    {reservationError}
+                    {paymentError}
                   </div>
                 )}
                 <div className="space-y-2 pt-1">
@@ -379,7 +383,9 @@ export default function PaymentModal({
                     {processing ? (
                       <span className="loading loading-spinner loading-xs"></span>
                     ) : (
-                      'I Have Paid — Get Handshake OTP'
+                      canRegenerateOtp
+                        ? 'I Have Paid — Regenerate Handshake OTP'
+                        : 'I Have Paid — Get / Regenerate Handshake OTP'
                     )}
                   </button>
                 </div>
