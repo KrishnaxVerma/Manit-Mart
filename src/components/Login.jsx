@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
 import {
-  browserLocalPersistence,
+  browserSessionPersistence,
   setPersistence,
   signInWithEmailAndPassword,
   sendPasswordResetEmail
@@ -44,7 +44,7 @@ export default function Login() {
     }
     setLd(true)
     try {
-      await setPersistence(auth, browserLocalPersistence)
+      await setPersistence(auth, browserSessionPersistence)
       const credential = await signInWithEmailAndPassword(auth, em.trim(), pw)
       toast.success('Logged in successfully!', { icon: '👋' })
       nav(credential.user.emailVerified ? '/dashboard' : '/verify-email')

@@ -1,5 +1,11 @@
 import { initializeApp } from 'firebase/app'
-import { getAuth, GoogleAuthProvider, sendEmailVerification } from 'firebase/auth'
+import {
+  getAuth,
+  GoogleAuthProvider,
+  sendEmailVerification,
+  setPersistence,
+  browserSessionPersistence
+} from 'firebase/auth'
 import { getFirestore } from 'firebase/firestore'
 import { getFunctions, connectFunctionsEmulator } from 'firebase/functions'
 
@@ -15,6 +21,12 @@ const cfg = {
 
 const app = initializeApp(cfg)
 export const auth = getAuth(app)
+
+// Set session-only persistence so user is logged out when tab/browser is closed
+setPersistence(auth, browserSessionPersistence).catch((err) => {
+  console.warn('Could not set browserSessionPersistence:', err)
+})
+
 export const db = getFirestore(app)
 export const functions = getFunctions(app, 'asia-south1')
 
@@ -26,4 +38,3 @@ if (import.meta.env.DEV && import.meta.env.VITE_USE_FUNCTIONS_EMULATOR === 'true
 export const gProvider = new GoogleAuthProvider()
 export { sendEmailVerification }
 export default app
-

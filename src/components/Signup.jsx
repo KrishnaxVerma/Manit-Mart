@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { createUserWithEmailAndPassword } from 'firebase/auth'
+import { createUserWithEmailAndPassword, setPersistence, browserSessionPersistence } from 'firebase/auth'
 import { setDoc, doc } from 'firebase/firestore'
 import { auth, db, sendEmailVerification } from '../firebase'
 import { useNavigate, Link } from 'react-router-dom'
@@ -35,6 +35,7 @@ export default function Signup() {
 
     setLd(true)
     try {
+      await setPersistence(auth, browserSessionPersistence)
       const cred = await createUserWithEmailAndPassword(auth, sanitizedEmail, pw)
       const u = cred.user
       const uid = u.uid
