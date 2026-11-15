@@ -101,10 +101,14 @@ export default function Buy() {
     const normalizedCategory = String(product.category || '').trim().toLowerCase()
     const normalizedCondition = String(product.condition || '').trim().toLowerCase()
 
+    const matchesKeywords = Array.isArray(product.keywords) &&
+      product.keywords.some((kw) => typeof kw === 'string' && kw.toLowerCase().includes(normalizedSearch))
+
     if (
       normalizedSearch &&
       !product.title?.toLowerCase().includes(normalizedSearch) &&
-      !product.description?.toLowerCase().includes(normalizedSearch)
+      !product.description?.toLowerCase().includes(normalizedSearch) &&
+      !matchesKeywords
     ) {
       return false
     }

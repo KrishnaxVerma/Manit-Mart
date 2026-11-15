@@ -35,6 +35,12 @@
   - One-click UPI Intent deep-linking for mobile devices (GPay, PhonePe, Paytm).
   - Secure handover verification with buyer-seller OTP confirmation modal (`VerifyOtpModal`).
 
+- 🤖 **AI-Powered Listing Assistant (Google Gemini)**
+  - Auto-generates student-friendly listing titles, structured descriptions, optimal category matching, and search keywords with a single click ("✨ Generate with AI").
+  - Multimodal understanding: utilizes uploaded product images for visual context when provided.
+  - Strictly factual: prevents hallucination of unverified specs or working conditions.
+  - Secure architecture: powered by Firebase Cloud Functions and Cloud Secret Manager (`GEMINI_API_KEY`), keeping API credentials off the client.
+
 - 📦 **Comprehensive Product Listings**
   - Sell items with title, detailed description, condition, category, and pricing.
   - Multi-image upload (up to 5 high-resolution images) powered by **Cloudinary**.
@@ -210,6 +216,19 @@ VITE_CLOUDINARY_FOLDER=manit_mart/products
    firebase use your_project_id
    firebase deploy --only firestore
    ```
+4. **Deploy AI Assistant Cloud Function & Configure Secret**:
+   > ⚠️ **Firebase Billing Requirement**: Deploying Cloud Functions requires the Firebase **Blaze (Pay-as-you-go)** plan. Firebase includes 2M free invocations/month, and Google AI Studio provides free-tier API keys for Gemini Flash.
+   ```bash
+   # Configure Gemini API Key securely in Cloud Secret Manager
+   firebase functions:secrets:set GEMINI_API_KEY
+
+   # Deploy functions
+   cd functions
+   npm install
+   cd ..
+   firebase deploy --only functions
+   ```
+   *(For local testing with the Firebase Emulator Suite, copy `functions/.env.example` to `functions/.env.local` and add your `GEMINI_API_KEY`).*
 
 ### Step 5: Start the Development Server
 
@@ -251,6 +270,7 @@ In the project directory, you can run:
 - [x] UPI QR code generation and OTP verification modal
 - [x] Multi-image Cloudinary uploads with auto-optimization
 - [x] Wishlist and saved items tracking
+- [x] AI-powered listing assistant with Google Gemini (titles, descriptions, categories, search keywords)
 - [ ] Push notifications for new messages and price drops (Firebase Cloud Messaging)
 - [ ] Automated image content moderation
 - [ ] Mobile application using React Native / Flutter

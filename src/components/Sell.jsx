@@ -8,6 +8,7 @@ import ProductCard from './BookCard'
 import { uploadMultipleImages } from '../utils/imageUpload'
 import { getProductImages } from '../utils/productImages'
 import OnboardingModal from './OnboardingModal'
+import { generateListingWithAI } from '../services/aiListingService'
 
 const MAX_IMAGES = 5
 const MAX_IMAGE_SIZE = 5 * 1024 * 1024
@@ -16,8 +17,12 @@ const createInitialForm = () => ({
   title: '',
   category: 'Books',
   price: '',
+  originalPrice: '',
   condition: 'Good',
   description: '',
+  additionalInfo: '',
+  keywords: [],
+  conditionSummary: '',
   imageUrls: [],
   imageFiles: []
 })
@@ -32,6 +37,9 @@ export default function Sell() {
   const [sellerUpi, setSellerUpi] = useState(null)
   const [checkingUpi, setCheckingUpi] = useState(true)
   const [showUpiModal, setShowUpiModal] = useState(false)
+  const [isGeneratingAI, setIsGeneratingAI] = useState(false)
+  const [aiGeneratedSuccess, setAiGeneratedSuccess] = useState(false)
+  const [keywordInput, setKeywordInput] = useState('')
   const nav = useNavigate()
 
   const categories = ['Books', 'Electronics', 'Accessories', 'Stationary', 'Others']
@@ -130,21 +138,96 @@ export default function Sell() {
   const startEdit = (product) => {
     setEditingId(product.id)
     setFrm({
-      title: product.title,
-      category: product.category,
-      price: product.price.toString(),
-      condition: product.condition,
+      title: product.title || '',
+      category: product.category || 'Books',
+      price: product.price ? product.price.toString() : '',
+      originalPrice: product.originalPrice ? product.originalPrice.toString() : '',
+      condition: product.condition || 'Good',
       description: product.description || '',
+      additionalInfo: '',
+      keywords: Array.isArray(product.keywords) ? product.keywords : [],
+      conditionSummary: product.conditionSummary || '',
       imageUrls: getProductImages(product),
       imageFiles: []
     })
+    setAiGeneratedSuccess(false)
   }
 
   const cancelEdit = () => {
     setEditingId(null)
     setFrm(createInitialForm())
+    setAiGeneratedSuccess(false)
     if (fileInputRef.current) {
       fileInputRef.current.value = ''
+    }
+  }
+
+  const handleAIGenerate = async () => {
+    if (isGeneratingAI) return
+
+    const roughTitle = (frm.title || '').trim()
+    if (!roughTitle || roughTitle.length < 2) {
+      toast.error('Please enter a product title or rough name first.')
+      return
+    }
+
+    if (!frm.condition) {
+      toast.error('Please select the item condition.')
+      return
+    }
+
+    setIsGeneratingAI(true)
+    setAiGeneratedSuccess(false)
+
+    try {
+      const firstImageFile = frm.imageFiles && frm.imageFiles.length > 0 ? frm.imageFiles[0] : null
+
+      const generated = await generateListingWithAI({
+        productName: roughTitle,
+        category: frm.category,
+        condition: frm.condition,
+        price: frm.price,
+        originalPrice: frm.originalPrice,
+        additionalInfo: frm.additionalInfo,
+        imageFile: firstImageFile
+      })
+
+      setFrm((prev) => ({
+        ...prev,
+        title: generated.title || prev.title,
+        description: generated.description || prev.description,
+        category: generated.category || prev.category,
+        keywords: generated.keywords && generated.keywords.length > 0 ? generated.keywords : prev.keywords,
+        conditionSummary: generated.conditionSummary || prev.conditionSummary
+      }))
+
+      setAiGeneratedSuccess(true)
+      toast.success('✨ Listing generated with AI! You can review and edit all fields.', {
+        duration: 4000
+      })
+    } catch (err) {
+      console.error('AI generation error:', err)
+      toast.error(err.message || 'Failed to generate listing with AI')
+    } finally {
+      setIsGeneratingAI(false)
+    }
+  }
+
+  const removeKeyword = (idxToRemove) => {
+    setFrm((prev) => ({
+      ...prev,
+      keywords: prev.keywords.filter((_, i) => i !== idxToRemove)
+    }))
+  }
+
+  const addCustomKeyword = () => {
+    const val = keywordInput.trim()
+    if (val && !frm.keywords.includes(val)) {
+      setFrm((prev) => ({
+        ...prev,
+        keywords: [...prev.keywords, val]
+      }))
+      setKeywordInput('')
     }
   }
 
@@ -225,6 +308,9 @@ export default function Sell() {
         description: frm.description.trim(),
         imageUrls: finalImageUrls,
         price: Number(frm.price),
+        originalPrice: frm.originalPrice ? Number(frm.originalPrice) : null,
+        keywords: Array.isArray(frm.keywords) ? frm.keywords : [],
+        conditionSummary: frm.conditionSummary || '',
         sellerId: auth.currentUser.uid,
         sellerName,
         sellerEmail,
@@ -232,6 +318,7 @@ export default function Sell() {
       }
 
       delete productData.imageFiles
+      delete productData.additionalInfo
 
       if (editingId) {
         await updateDoc(doc(db, 'products', editingId), productData)
@@ -246,6 +333,7 @@ export default function Sell() {
         })
         toast.success('Product listed successfully')
         setFrm(createInitialForm())
+        setAiGeneratedSuccess(false)
         if (fileInputRef.current) {
           fileInputRef.current.value = ''
         }
@@ -297,48 +385,172 @@ export default function Sell() {
         )}
 
         <div className="bg-white dark:bg-slate-800 rounded-lg border border-gray-200 dark:border-slate-700 p-6 mb-8">
-          <h2 className="text-xl font-semibold mb-4 text-gray-900 dark:text-white">
-            {editingId ? 'Edit Product' : 'Add New Product'}
-          </h2>
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 mb-4">
+            <h2 className="text-xl font-semibold text-gray-900 dark:text-white">
+              {editingId ? 'Edit Product' : 'Add New Product'}
+            </h2>
+            <div className="flex items-center gap-1.5 text-xs text-gray-500 dark:text-gray-400">
+              <span className="inline-block w-2 h-2 rounded-full bg-emerald-500"></span>
+              <span>AI Listing Assistant Ready</span>
+            </div>
+          </div>
+
+          {/* AI Quick Assistant Bar */}
+          <div className="mb-6 p-4 rounded-xl bg-gradient-to-r from-blue-50/90 via-indigo-50/70 to-purple-50/80 dark:from-slate-750 dark:via-slate-800 dark:to-indigo-950/40 border border-blue-200/80 dark:border-indigo-800/60 shadow-sm">
+            <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-3">
+              <div className="flex items-start gap-3">
+                <div className="w-9 h-9 rounded-xl bg-gradient-to-tr from-blue-600 to-indigo-600 text-white flex items-center justify-center text-lg shadow-sm shrink-0">
+                  ✨
+                </div>
+                <div>
+                  <div className="flex items-center gap-2">
+                    <span className="font-bold text-sm text-gray-900 dark:text-white">
+                      AI Listing Assistant
+                    </span>
+                    <span className="badge badge-primary badge-xs font-semibold py-1">Gemini</span>
+                    {frm.imageFiles.length > 0 && (
+                      <span className="badge badge-accent badge-xs font-medium">📷 Image Context Ready</span>
+                    )}
+                  </div>
+                  <p className="text-xs text-gray-600 dark:text-gray-300 mt-0.5">
+                    Provide rough product details below and click to generate an attractive title, description, and search keywords.
+                  </p>
+                </div>
+              </div>
+
+              <button
+                type="button"
+                onClick={handleAIGenerate}
+                disabled={isGeneratingAI || ld}
+                className="btn btn-sm btn-primary rounded-xl font-semibold gap-2 text-white bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 border-none shadow-sm w-full md:w-auto"
+              >
+                {isGeneratingAI ? (
+                  <>
+                    <span className="loading loading-spinner loading-xs"></span>
+                    <span>Generating your listing...</span>
+                  </>
+                ) : (
+                  <>
+                    <span>✨</span>
+                    <span>Generate with AI</span>
+                  </>
+                )}
+              </button>
+            </div>
+
+            {/* Loading state progress message */}
+            {isGeneratingAI && (
+              <div className="mt-3 pt-3 border-t border-blue-200/60 dark:border-indigo-800/60 flex items-center gap-2 text-xs font-medium text-blue-700 dark:text-blue-300">
+                <span className="loading loading-dots loading-xs"></span>
+                <span>Generating your listing... Polishing title, crafting description, and categorizing with Gemini.</span>
+              </div>
+            )}
+
+            {/* Success state indicator */}
+            {aiGeneratedSuccess && !isGeneratingAI && (
+              <div className="mt-3 pt-3 border-t border-emerald-200 dark:border-emerald-800/60 flex items-center justify-between gap-2 text-xs text-emerald-700 dark:text-emerald-300">
+                <span className="flex items-center gap-1.5 font-medium">
+                  <span>✓</span> Generated successfully! You remain in full control and can edit every field freely.
+                </span>
+                <button
+                  type="button"
+                  onClick={() => setAiGeneratedSuccess(false)}
+                  className="text-xs opacity-70 hover:opacity-100"
+                >
+                  Dismiss
+                </button>
+              </div>
+            )}
+          </div>
+
           <form onSubmit={sub} className="space-y-4">
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div>
+                <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">
+                  Product Title / Name *
+                </label>
+                <input
+                  type="text"
+                  placeholder="e.g. Casio fx-991EX Scientific Calculator"
+                  value={frm.title}
+                  onChange={(e) => setFrm({ ...frm, title: e.target.value })}
+                  className="w-full px-3 py-2 border border-gray-200 dark:border-slate-600 rounded focus:ring-1 focus:ring-blue-500 outline-none bg-white dark:bg-slate-700 text-gray-900 dark:text-white"
+                  required
+                />
+              </div>
+
+              <div>
+                <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">
+                  Category *
+                </label>
+                <select
+                  value={frm.category}
+                  onChange={(e) => setFrm({ ...frm, category: e.target.value })}
+                  className="w-full px-3 py-2 border border-gray-200 dark:border-slate-600 rounded focus:ring-1 focus:ring-blue-500 outline-none bg-white dark:bg-slate-700 text-gray-900 dark:text-white"
+                >
+                  {categories.map(cat => (
+                    <option key={cat} value={cat}>{cat}</option>
+                  ))}
+                </select>
+              </div>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              <div>
+                <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">
+                  Selling Price (₹) *
+                </label>
+                <input
+                  type="number"
+                  placeholder="Selling Price (₹)"
+                  value={frm.price}
+                  onChange={(e) => setFrm({ ...frm, price: e.target.value })}
+                  className="w-full px-3 py-2 border border-gray-200 dark:border-slate-600 rounded focus:ring-1 focus:ring-blue-500 outline-none bg-white dark:bg-slate-700 text-gray-900 dark:text-white"
+                  required
+                />
+              </div>
+
+              <div>
+                <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">
+                  Original Price (₹) <span className="text-gray-400 font-normal">(optional)</span>
+                </label>
+                <input
+                  type="number"
+                  placeholder="e.g. 1500"
+                  value={frm.originalPrice}
+                  onChange={(e) => setFrm({ ...frm, originalPrice: e.target.value })}
+                  className="w-full px-3 py-2 border border-gray-200 dark:border-slate-600 rounded focus:ring-1 focus:ring-blue-500 outline-none bg-white dark:bg-slate-700 text-gray-900 dark:text-white"
+                />
+              </div>
+
+              <div>
+                <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">
+                  Condition *
+                </label>
+                <select
+                  value={frm.condition}
+                  onChange={(e) => setFrm({ ...frm, condition: e.target.value })}
+                  className="w-full px-3 py-2 border border-gray-200 dark:border-slate-600 rounded focus:ring-1 focus:ring-blue-500 outline-none bg-white dark:bg-slate-700 text-gray-900 dark:text-white"
+                >
+                  <option value="Like New">Like New</option>
+                  <option value="Good">Good</option>
+                  <option value="Fair">Fair</option>
+                  <option value="Poor">Poor</option>
+                </select>
+              </div>
+            </div>
+
+            <div>
+              <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">
+                Additional Information / Highlights <span className="text-gray-400 font-normal">(optional, guides Gemini with specific details)</span>
+              </label>
               <input
                 type="text"
-                placeholder="Product Title"
-                value={frm.title}
-                onChange={(e) => setFrm({ ...frm, title: e.target.value })}
-                className="px-3 py-2 border border-gray-200 dark:border-slate-600 rounded focus:ring-1 focus:ring-blue-500 outline-none bg-white dark:bg-slate-700 text-gray-900 dark:text-white"
-                required
+                placeholder="e.g. All functions working properly, bought last semester, original manual included"
+                value={frm.additionalInfo}
+                onChange={(e) => setFrm({ ...frm, additionalInfo: e.target.value })}
+                className="w-full px-3 py-2 border border-gray-200 dark:border-slate-600 rounded focus:ring-1 focus:ring-blue-500 outline-none bg-white dark:bg-slate-700 text-gray-900 dark:text-white text-sm"
               />
-              <select
-                value={frm.category}
-                onChange={(e) => setFrm({ ...frm, category: e.target.value })}
-                className="px-3 py-2 border border-gray-200 dark:border-slate-600 rounded focus:ring-1 focus:ring-blue-500 outline-none bg-white dark:bg-slate-700 text-gray-900 dark:text-white"
-              >
-                {categories.map(cat => (
-                  <option key={cat} value={cat}>{cat}</option>
-                ))}
-              </select>
-            </div>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <input
-                type="number"
-                placeholder="Price (₹)"
-                value={frm.price}
-                onChange={(e) => setFrm({ ...frm, price: e.target.value })}
-                className="px-3 py-2 border border-gray-200 dark:border-slate-600 rounded focus:ring-1 focus:ring-blue-500 outline-none bg-white dark:bg-slate-700 text-gray-900 dark:text-white"
-                required
-              />
-              <select
-                value={frm.condition}
-                onChange={(e) => setFrm({ ...frm, condition: e.target.value })}
-                className="px-3 py-2 border border-gray-200 dark:border-slate-600 rounded focus:ring-1 focus:ring-blue-500 outline-none bg-white dark:bg-slate-700 text-gray-900 dark:text-white"
-              >
-                <option value="Like New">Like New</option>
-                <option value="Good">Good</option>
-                <option value="Fair">Fair</option>
-                <option value="Poor">Poor</option>
-              </select>
             </div>
             
             <div>
@@ -423,18 +635,94 @@ export default function Sell() {
           </div>
             </div>
 
-            <textarea
-              placeholder="Description (optional)"
-              value={frm.description}
-              onChange={(e) => setFrm({ ...frm, description: e.target.value })}
-              className="w-full px-3 py-2 border border-gray-200 dark:border-slate-600 rounded focus:ring-1 focus:ring-blue-500 outline-none bg-white dark:bg-slate-700 text-gray-900 dark:text-white"
-              rows="3"
-            />
-            <div className="flex gap-2">
+            <div>
+              <div className="flex justify-between items-center mb-1">
+                <label className="block text-xs font-medium text-gray-700 dark:text-gray-300">
+                  Description <span className="text-gray-400 font-normal">(optional, max 500 characters)</span>
+                </label>
+                <span className={`text-xs ${frm.description.length > 500 ? 'text-red-500 font-bold' : 'text-gray-400'}`}>
+                  {frm.description.length}/500
+                </span>
+              </div>
+              <textarea
+                placeholder="Product description... Click '✨ Generate with AI' above to auto-generate or write your own."
+                value={frm.description}
+                onChange={(e) => setFrm({ ...frm, description: e.target.value })}
+                className="w-full px-3 py-2 border border-gray-200 dark:border-slate-600 rounded focus:ring-1 focus:ring-blue-500 outline-none bg-white dark:bg-slate-700 text-gray-900 dark:text-white"
+                rows="3"
+                maxLength={500}
+              />
+            </div>
+
+            {/* Generated Condition Summary & Keywords */}
+            {(frm.conditionSummary || (frm.keywords && frm.keywords.length > 0)) && (
+              <div className="p-3.5 bg-gray-50 dark:bg-slate-900/60 rounded-xl border border-gray-200 dark:border-slate-700 space-y-2.5">
+                {frm.conditionSummary && (
+                  <div className="flex flex-wrap items-center gap-2 text-xs">
+                    <span className="font-semibold text-gray-700 dark:text-gray-300">Condition Summary:</span>
+                    <span className="text-gray-600 dark:text-gray-400 italic bg-white dark:bg-slate-800 px-2 py-0.5 rounded border border-gray-200 dark:border-slate-700">
+                      {frm.conditionSummary}
+                    </span>
+                  </div>
+                )}
+
+                {frm.keywords && frm.keywords.length > 0 && (
+                  <div>
+                    <span className="text-xs font-semibold text-gray-700 dark:text-gray-300 block mb-1.5">
+                      Search Keywords (helps students find this item):
+                    </span>
+                    <div className="flex flex-wrap items-center gap-1.5">
+                      {frm.keywords.map((kw, idx) => (
+                        <span
+                          key={idx}
+                          className="badge badge-outline badge-sm gap-1 text-xs py-2 px-2.5 bg-white dark:bg-slate-800 border-gray-300 dark:border-slate-600 text-gray-700 dark:text-gray-300"
+                        >
+                          #{kw}
+                          <button
+                            type="button"
+                            onClick={() => removeKeyword(idx)}
+                            className="hover:text-red-500 text-xs ml-0.5"
+                            title="Remove keyword"
+                          >
+                            ×
+                          </button>
+                        </span>
+                      ))}
+                      <div className="flex items-center gap-1">
+                        <input
+                          type="text"
+                          placeholder="+ Add keyword"
+                          value={keywordInput}
+                          onChange={(e) => setKeywordInput(e.target.value)}
+                          onKeyDown={(e) => {
+                            if (e.key === 'Enter') {
+                              e.preventDefault()
+                              addCustomKeyword()
+                            }
+                          }}
+                          className="input input-xs input-bordered rounded text-xs w-28 bg-white dark:bg-slate-800"
+                        />
+                        {keywordInput.trim() && (
+                          <button
+                            type="button"
+                            onClick={addCustomKeyword}
+                            className="btn btn-xs btn-ghost text-blue-600 dark:text-blue-400"
+                          >
+                            Add
+                          </button>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
+
+            <div className="flex gap-2 pt-2">
               <button
                 type="submit"
                 disabled={ld}
-                className="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700 disabled:bg-gray-400 transition"
+                className="bg-blue-600 text-white px-5 py-2 rounded hover:bg-blue-700 disabled:bg-gray-400 transition font-medium"
               >
                 {ld ? (editingId ? 'Updating...' : 'Listing...') : (editingId ? 'Update Product' : 'List Product')}
               </button>

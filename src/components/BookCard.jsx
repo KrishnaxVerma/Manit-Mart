@@ -293,6 +293,26 @@ export default function ProductCard({ product, onListingUnavailable }) {
                         {product.description || 'No description provided'}
                       </p>
                     </div>
+                    {product.conditionSummary && (
+                      <div>
+                        <span className="text-xs text-gray-500 dark:text-gray-400 uppercase tracking-wide">Condition Notes</span>
+                        <p className="text-xs text-gray-600 dark:text-gray-300 mt-0.5 italic">
+                          {product.conditionSummary}
+                        </p>
+                      </div>
+                    )}
+                    {Array.isArray(product.keywords) && product.keywords.length > 0 && (
+                      <div>
+                        <span className="text-xs text-gray-500 dark:text-gray-400 uppercase tracking-wide block mb-1">Keywords</span>
+                        <div className="flex flex-wrap gap-1">
+                          {product.keywords.map((kw, i) => (
+                            <span key={i} className="badge badge-sm badge-ghost text-xs">
+                              #{kw}
+                            </span>
+                          ))}
+                        </div>
+                      </div>
+                    )}
                   </div>
                 </div>
               </div>
