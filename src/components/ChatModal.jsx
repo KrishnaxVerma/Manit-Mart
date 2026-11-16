@@ -325,13 +325,13 @@ export default function ChatModal({
 
   return (
     <div
-      className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-2 sm:p-4 animate-in fade-in duration-200"
+      className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-0 sm:p-4 animate-in fade-in duration-200"
       onClick={handleCloseModal}
       role="dialog"
       aria-modal="true"
     >
       <div
-        className="relative flex flex-col w-full max-w-2xl h-[92vh] sm:h-[85vh] bg-white dark:bg-slate-900 rounded-2xl shadow-2xl border border-gray-200 dark:border-slate-800 overflow-hidden"
+        className="relative flex flex-col w-full max-w-2xl h-[100dvh] sm:h-[85vh] sm:max-h-[850px] bg-white dark:bg-slate-900 rounded-none sm:rounded-2xl shadow-2xl border-0 sm:border border-gray-200 dark:border-slate-800 overflow-hidden"
         onClick={(e) => e.stopPropagation()}
       >
         {/* ================= TOP BAR ================= */}
@@ -679,13 +679,13 @@ export default function ChatModal({
         )}
 
         {/* ================= BOTTOM INPUT BAR ================= */}
-        <div className="p-3 border-t border-gray-200 dark:border-slate-800 bg-white dark:bg-slate-900 shrink-0">
-          <form onSubmit={handleSend} className="flex items-center gap-2">
+        <div className="p-2 sm:p-3 border-t border-gray-200 dark:border-slate-800 bg-white dark:bg-slate-900 shrink-0">
+          <form onSubmit={handleSend} className="flex items-center gap-1.5 sm:gap-2">
             {/* Make an Offer Button */}
             <button
               type="button"
               onClick={() => setShowOfferModal(!showOfferModal)}
-              className={`btn btn-sm shrink-0 gap-1.5 transition ${
+              className={`btn btn-sm shrink-0 px-2 sm:px-3 gap-1 transition ${
                 showOfferModal
                   ? 'btn-warning text-gray-900'
                   : 'btn-outline border-gray-300 dark:border-slate-700 text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-slate-800'
@@ -694,7 +694,7 @@ export default function ChatModal({
             >
               <svg
                 xmlns="http://www.w3.org/2000/svg"
-                className="h-4 w-4"
+                className="h-4 w-4 shrink-0"
                 fill="none"
                 viewBox="0 0 24 24"
                 stroke="currentColor"
@@ -706,7 +706,7 @@ export default function ChatModal({
                   d="M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A1.994 1.994 0 013 12V7a4 4 0 014-4z"
                 />
               </svg>
-              <span className="hidden sm:inline">Make Offer</span>
+              <span className="hidden md:inline">Make Offer</span>
             </button>
 
             {/* Pay via UPI Button (Buyer only, when AVAILABLE) */}
@@ -714,12 +714,12 @@ export default function ChatModal({
               <button
                 type="button"
                 onClick={handleOpenPayment}
-                className="btn btn-sm btn-success text-white shrink-0 gap-1.5 shadow-xs transition"
+                className="btn btn-sm btn-success text-white shrink-0 px-2 sm:px-3 gap-1 shadow-xs transition"
                 title="Pay via dynamic UPI QR code"
               >
                 <svg
                   xmlns="http://www.w3.org/2000/svg"
-                  className="h-4 w-4"
+                  className="h-4 w-4 shrink-0"
                   fill="none"
                   viewBox="0 0 24 24"
                   stroke="currentColor"
@@ -732,7 +732,7 @@ export default function ChatModal({
                   />
                 </svg>
                 <span className="hidden sm:inline font-semibold">Pay via UPI</span>
-                <span className="sm:hidden font-semibold">Pay</span>
+                <span className="sm:hidden font-semibold text-xs">Pay</span>
               </button>
             )}
 
@@ -741,11 +741,11 @@ export default function ChatModal({
               <button
                 type="button"
                 onClick={() => setShowVerifyModal(true)}
-                className="btn btn-sm btn-warning text-gray-900 shrink-0 gap-1.5 font-bold shadow-xs transition"
+                className="btn btn-sm btn-warning text-gray-900 shrink-0 px-2 sm:px-3 gap-1 font-bold shadow-xs transition"
                 title="Verify Handshake OTP"
               >
                 <span>🤝</span>
-                <span className="hidden sm:inline">Verify OTP</span>
+                <span className="hidden sm:inline text-xs">Verify OTP</span>
               </button>
             )}
 
@@ -755,15 +755,16 @@ export default function ChatModal({
               type="text"
               value={inputText}
               onChange={(e) => setInputText(e.target.value)}
-              placeholder="Type your message..."
-              className="input input-bordered input-sm flex-1 bg-gray-50 dark:bg-slate-800 border-gray-200 dark:border-slate-700 text-gray-900 dark:text-white focus:outline-none focus:ring-1 focus:ring-blue-500"
+              placeholder="Type a message..."
+              className="input input-bordered input-sm flex-1 min-w-0 bg-gray-50 dark:bg-slate-800 border-gray-200 dark:border-slate-700 text-gray-900 dark:text-white focus:outline-none focus:ring-1 focus:ring-blue-500 text-sm"
             />
 
             {/* Send Button */}
             <button
               type="submit"
               disabled={sending || !inputText.trim()}
-              className="btn btn-primary btn-sm px-4 shrink-0 text-white"
+              className="btn btn-primary btn-sm px-3 sm:px-4 shrink-0 text-white"
+              aria-label="Send message"
             >
               {sending ? (
                 <span className="loading loading-spinner loading-xs"></span>
@@ -779,8 +780,8 @@ export default function ChatModal({
               )}
             </button>
           </form>
-          <div className="mt-1 text-[11px] text-gray-400 text-center">
-            🔒 Safe Campus Trading: Coordinate handover in public areas (Hostel Main Gate, Library, SAC).
+          <div className="mt-1 text-[10px] sm:text-[11px] text-gray-400 text-center truncate">
+            🔒 Safe Campus Trading: Coordinate handover in public areas.
           </div>
         </div>
 
